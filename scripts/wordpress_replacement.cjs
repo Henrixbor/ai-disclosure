@@ -1,6 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { engine, browserType } = require('./browser_engine.cjs');
+const login = require('./wordpress_login.cjs');
 
 module.exports = async function replacementChecks(docker, web, base, password, archive) {
   const php = code => docker(['exec', '-i', web, 'php'], '<?php require "/wordpress/wp-load.php"; wp_set_current_user(1); ' + code);
@@ -22,10 +23,7 @@ module.exports = async function replacementChecks(docker, web, base, password, a
   const page = await browser.newPage();
   let stage = 'login';
   try {
-    await page.goto(new URL('/wp-login.php', base).href);
-    await page.locator('#user_login').fill('admin');
-    await page.locator('#user_pass').fill(password);
-    await Promise.all([page.waitForURL('**/wp-admin/**'), page.locator('#wp-submit').click()]);
+    await login(page, base, password);
     async function upload(buffer) {
       await page.goto(new URL('/wp-admin/plugin-install.php?tab=upload', base).href);
       await page.locator('input[name="pluginzip"]').setInputFiles({ name: 'ai-disclosure-wordpress.zip', mimeType: 'application/zip', buffer });
@@ -61,7 +59,7 @@ module.exports = async function replacementChecks(docker, web, base, password, a
     assert.ok(!html.includes('WORDPRESS_PRIVATE_EVIDENCE'));
     console.log('WordPress admin upload (' + engine + '): invalid ZIP and unwritable staging rejected without changes; same-version replacement preserves activation, private records, publication gate and notice; old files removed');
   } catch (error) {
-    console.error('Plugin replacement screen:', stage, new URL(page.url()).pathname, (await page.locator('body').innerText({ timeout: 2000 }).catch(() => 'unavailable')).slice(-2500));
+    if (stage !== 'login') console.error('Plugin replacement screen:', stage, new URL(page.url()).pathname, (await page.locator('body').innerText({ timeout: 2000 }).catch(() => 'unavailable')).slice(-2500));
     throw error;
   } finally { await browser.close(); }
 };

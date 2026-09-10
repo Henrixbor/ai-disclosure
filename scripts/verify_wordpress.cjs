@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { engine, browserType } = require('./browser_engine.cjs');
 const { randomBytes, createHash } = require('node:crypto');
 const wordpressPackage = require('./wordpress_package.cjs');
+const login = require('./wordpress_login.cjs');
 
 async function editorChecks(browser, base, result, password) {
   const context = await browser.newContext();
@@ -32,10 +33,7 @@ async function editorChecks(browser, base, result, password) {
   }
   await page.addLocatorHandler(page.locator('body'), ensureEditor, { noWaitAfter: true });
   try {
-    await page.goto(new URL('/wp-login.php', base).href);
-    await page.locator('#user_login').fill('admin');
-    await page.locator('#user_pass').fill(password);
-    await Promise.all([page.waitForURL('**/wp-admin/**'), page.locator('#wp-submit').click()]);
+    await login(page, base, password);
     for (const [mode, id] of [['classic', result.classic_id], ['block', result.block_id]]) {
       await page.goto(new URL('/wp-admin/post.php?post=' + id + '&action=edit', base).href);
       const script = await page.locator('#ai-disclosure-editor-js').getAttribute('src');

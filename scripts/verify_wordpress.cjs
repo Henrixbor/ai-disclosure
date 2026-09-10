@@ -52,7 +52,7 @@ async function editorChecks(browser, base, result, password) {
       assert.ok(!(await page.locator('[data-aid-status]').innerText()).includes('compliant'));
       // Save the assessed text as a draft, withdraw through the panel, then restore explicitly.
       if (mode === 'classic') {
-        await Promise.all([page.waitForURL('**/post.php?**'), page.locator('#save-post').click()]);
+        await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.locator('#save-post').click()]);
       } else {
         await page.evaluate(() => wp.data.dispatch('core/editor').savePost());
       }
@@ -69,7 +69,7 @@ async function editorChecks(browser, base, result, password) {
       await page.waitForFunction(() => document.querySelector('[data-aid-status]').textContent.includes('No extra text notice'));
       // Publish through the actual editor after recording, not a direct API shortcut.
       if (mode === 'classic') {
-        await Promise.all([page.waitForURL('**/post.php?**'), page.locator('#publish').click()]);
+        await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.locator('#publish').click()]);
         await page.locator('#message').waitFor();
       } else {
         await page.getByRole('button', { name: 'Publish', exact: true }).click();

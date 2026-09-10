@@ -13,7 +13,7 @@ add_action('add_meta_boxes', static function ($type, $post) {
         || !current_user_can(get_post_type_object($type)->cap->publish_posts)) return;
     add_meta_box('ai-disclosure-editor', 'AI disclosure', static function () {
         echo '<div class="aid-editor"><p>Load the text currently in the editor, then record its source and publication context. This does not publish the post.</p>';
-        echo '<button type="button" class="button" data-aid-load>Load current text</button>';
+        echo '<button type="button" class="button" data-aid-load disabled>Load current text</button>';
         echo '<fieldset data-aid-fields disabled><legend class="screen-reader-text">Disclosure facts</legend><div class="aid-editor-grid">';
         editor_select('role', 'Your role', ['unknown' => 'Not established', 'publisher' => 'Publisher / deployer', 'provider' => 'AI system provider', 'both' => 'Both']);
         editor_select('origin', 'Content source', ['unknown' => 'Unknown', 'human' => 'Human-created', 'ai_generated' => 'AI-generated', 'ai_modified' => 'AI-modified']);

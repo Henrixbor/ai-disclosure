@@ -115,4 +115,5 @@ wp.domReady(() => {
     toggle();
     message(result.decision === 'disclose' ? 'Assessment recorded. This version requires a visible notice when published.' : 'Assessment recorded. No extra text notice is required by these declared facts.');
   }));
+  load.disabled = false;
 });

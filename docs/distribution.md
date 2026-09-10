@@ -19,6 +19,15 @@ python3 scripts/install.py --project /absolute/path/to/your-site
 
 This installs into that project's skill directories. Do not install both a project skill and the same plugin unless you intentionally want two discoverable copies. Future-content coverage still requires integration with the project's publishing pipeline.
 
+Claude Code v2.1.224+ can install the checksum-pinned alpha through this repository's catalog:
+
+```sh
+claude plugin marketplace add Henrixbor/ai-disclosure
+claude plugin install ai-disclosure@henrixbor-ai-disclosure
+```
+
+This is Henrixbor's catalog, not an official Anthropic listing. The catalog points to the versioned public archive and pins its SHA-256. Restart or reload plugins as directed by Claude. See [archive source requirements](https://code.claude.com/docs/en/plugin-marketplaces#zip-archives).
+
 For Claude Code local plugin testing, extract the plugin archive and launch `claude --plugin-dir /absolute/path/to/ai-disclosure`. The plugin skill is namespaced `/ai-disclosure:ai-disclosure`. Project-installed skills use `/ai-disclosure`. See [Claude's plugin documentation](https://code.claude.com/docs/en/plugins).
 
 The Codex plugin manifest is validated against the bundled plugin schema. This repository has not been admitted to an official catalog, and the archive alone does not configure a Codex marketplace. Use the project installer for working Codex installation today. Do not advertise nonexistent marketplace installation commands or imply OpenAI/Anthropic endorsement.

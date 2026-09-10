@@ -1,0 +1,19 @@
+{
+  "name": "henrixbor-ai-disclosure",
+  "owner": {
+    "name": "Henrixbor"
+  },
+  "plugins": [
+    {
+      "name": "ai-disclosure",
+      "description": "Minimal AI disclosure tools and skill. Development release; not legal certification.",
+      "version": "0.1.0-alpha.1",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/Henrixbor/ai-disclosure/releases/download/v0.1.0-alpha.1/ai-disclosure-plugin.zip",
+        "sha256": "8b436b5a341f3b581c78fcf278aefe0dfde7e34dff7aa86a7810c1cb38ce5d16"
+      }
+    }
+  ],
+  "description": "Henrixbor\u2019s development releases of AI Disclosure for pilot integrations."
+}

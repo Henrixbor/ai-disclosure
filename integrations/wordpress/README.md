@@ -1,6 +1,6 @@
 # WordPress adapter development
 
-This directory contains an **experimental text publishing plugin** and native PHP assessment engine. WordPress 7.1/PHP 8.3 tests cover REST/native updates, editor controls, explicit amendments, stale-writer rejection, superseded-policy scheduling checks, public content/excerpts/feeds and private evidence. It is not a production compliance plugin: broader surfaces, historical inventory and legal review remain open.
+This directory contains an **experimental text publishing plugin** and native PHP assessment engine. WordPress 7.1/PHP 8.3 tests cover REST/native updates, editor controls, explicit amendments, stale-writer rejection, superseded-policy scheduling checks, public content/excerpts/feeds and private evidence. It is not a production compliance plugin: broader surfaces, historical migration and legal review remain open.
 
 Activation adds publication gates for ordinary posts and pages. New publication and edits to published content through the supported routes need evidence recorded first. Unsupported body media, dynamic blocks and shortcodes are held. Test on an isolated copy before activation on an existing site; this can interrupt workflows that have not been integrated. Activation does not retroactively classify or rewrite historical posts.
 
@@ -21,6 +21,21 @@ Open **AI disclosure** below the editing area. In the block editor, open WordPre
 The panel does not save or publish the article itself. If the text changes after loading, it requires a fresh load and does not carry review into the new version. If another assessment has been recorded, it requires reading that assessment before changes. It never replaces unknown origin with an AI guess. Evidence fields use authenticated requests and stay out of public content. No additional frontend script is installed for visitors.
 
 The proposed-text endpoint is `POST /wp-json/ai-disclosure/v1/posts/{id}/inspection` with optional string `title`, `content` and `excerpt` fields. It returns the revision, supported-text flag, policy and any private matching assessment without saving anything. It has the same capabilities, 1 MiB request limit and private/no-store headers as assessment recording. This also gives agents a way to bind a review to proposed text before publication.
+
+## Inventory existing content
+
+Agents can read `GET /wp-json/ai-disclosure/v1/inventory?limit=25`. The endpoint requires publication capability, then checks edit and publication permissions on every item. It scans posts and pages in all statuses, including unpublished, auto-draft and trash records. It returns ID, type, status, a short title excerpt, exact text revision, `supported_text` and `decision`. It returns no evidence or article body and makes no changes.
+
+Continue with `after=<next_after>&through_id=<through_id>&limit=25`, keeping the first response's `through_id`. Stop only when `next_after` is null: an empty authorized page can still have more candidates. The default limit is 25, maximum 100. The limit bounds scanned database IDs, so fewer items may be returned after permission filtering. IDs created above the initial boundary belong to a later scan. Numeric cursors are traversal positions, not credentials or proof that omitted content does not exist.
+
+Use the inventory as a migration queue:
+
+1. Prioritize public and scheduled records whose decision is `unassessed` or `withdrawn`, and any record with `supported_text: false`.
+2. Retrieve the content through WordPress's authorized editor/REST access. Establish its actual source and context from creation records or the responsible publisher. Unknown origin remains unresolved; do not bulk-declare the archive AI-generated.
+3. Reinspect the current text revision before recording facts. Use the assessment/amendment endpoints for supported content. Preserve unresolved content as an explicit coverage gap; unsupported media needs its own integration.
+4. Verify the actual public view and cache invalidation after any new notice, and rescan after migration. Recording facts for an already-published supported version can add its notice without rewriting the article.
+
+This scan covers stored post/page text, not custom post types, featured media, metadata, widgets, independent assets or rendered theme output. The ID boundary does not freeze edits, deletions, permissions or assessment changes. Recheck every selected version before acting; a finished traversal is not a complete-site compliance report. Responses are private/no-store. Incorrect ranges return 400, authorization failures 401/403 and database failures 503.
 
 ## Publication transaction
 
@@ -77,7 +92,7 @@ Body media, shortcodes and unsupported/dynamic blocks are rejected by this text 
 
 ## Run the live tests
 
-From the repository root, install development dependencies with `npm ci --ignore-scripts`, install Chromium with `npx playwright install chromium`, then run `npm run test:wordpress`. Playground boots a disposable WordPress 7.1/PHP 8.3 site, activates the actual plugin, exercises native/REST operations and verifies public output in Chromium with JavaScript disabled. It also logs into disposable admin credentials to exercise the classic and block editor panels, stale text, recording, review amendments, draft withdrawal/restoration and actual editor publication. It closes the test server afterward. Production HTTPS/application-password configuration, other roles, themes and editor versions still need deployment-specific verification.
+From the repository root, install development dependencies with `npm ci --ignore-scripts`, install Chromium with `npx playwright install chromium`, then run `npm run test:wordpress`. Playground boots a disposable WordPress 7.1/PHP 8.3 site, activates the actual plugin, exercises native/REST operations and verifies public output in Chromium with JavaScript disabled. It also logs into disposable admin credentials to exercise the classic and block editor panels, stale text, recording, review amendments, draft withdrawal/restoration and actual editor publication. Inventory tests cover bounded traversal, permission filtering, fixed upper IDs, legacy unknown-origin publications, withdrawn/unsupported content and database failures. It closes the test server afterward. Production HTTPS/application-password configuration, other roles, themes and editor versions still need deployment-specific verification.
 
 The root development package pins Express's `qs` dependency to 6.16.0 for the patched query parser. This override belongs to the Playground test server; no npm packages ship in the WordPress plugin.
 
@@ -109,7 +124,7 @@ The verifier compares complete results across 9,253 inputs: origin and scope com
 
 ## Remaining integration contract
 
-Before production use, complete historical inventory, applicable additional surfaces and independent legal review. Test the exact target WordPress/database/theme combination; the current live fixture uses Playground's SQLite runtime, including a real database compare-and-swap check.
+Before production use, complete evidence-backed historical migration, applicable additional surfaces and independent legal review. Test the exact target WordPress/database/theme combination; the current live fixture uses Playground's SQLite runtime, including a real database compare-and-swap check.
 
 Publication gates must be verified against REST/block-editor updates, classic-editor updates, scheduled posts and supported programmatic publication. WordPress offers a [REST pre-insert filter](https://developer.wordpress.org/reference/hooks/rest_pre_insert_this-post_type/) and an [insert short-circuit filter](https://developer.wordpress.org/reference/hooks/wp_insert_post_empty_content/), but neither alone establishes coverage of every publishing path. Do not advertise that coverage until tested against a running WordPress instance.
 

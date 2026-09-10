@@ -171,6 +171,69 @@ aid_check(!\AiDisclosure\WordPress\replace_record($casKey, $previous, ['token' =
 aid_check(get_option($casKey) === ['token' => 'ORIGINAL'], 'Object cache reflects the committed winner');
 delete_option($casKey);
 
+// Historical discovery is bounded, private, and never guesses source facts.
+function aid_inventory(array $query = []) {
+    $request = new WP_REST_Request('GET', '/ai-disclosure/v1/inventory');
+    $request->set_query_params($query);
+    return rest_do_request($request);
+}
+wp_set_current_user(0);
+aid_check(aid_inventory()->get_status() >= 400, 'Anonymous inventory denied');
+wp_set_current_user($subscriber);
+aid_check(aid_inventory()->get_status() === 403, 'Subscriber inventory denied');
+wp_set_current_user(1);
+foreach ([['limit' => 101], ['limit' => 0], ['after' => -1], ['after' => '1e2'], ['through_id' => []], ['after' => '999999999999999999999999'], ['after' => 2, 'through_id' => 1]] as $invalid) {
+    aid_check(aid_inventory($invalid)->get_status() === 400, 'Invalid inventory range rejected');
+}
+$historical = wp_insert_post(['post_title' => 'Historical unknown origin', 'post_content' => '<p>Unclassified archive text.</p>', 'post_status' => 'draft'], true);
+// Model a publication predating activation; discovery must not relabel it.
+$wpdb->update($wpdb->posts, ['post_status' => 'publish'], ['ID' => $historical]);
+clean_post_cache($historical);
+$mediaArchive = wp_insert_post(['post_type' => 'page', 'post_title' => 'Historical media', 'post_content' => '<img src="example.png" alt="Unknown source">', 'post_status' => 'draft'], true);
+$withdrawArchiveId = wp_insert_post(['post_title' => 'Withdrawn archive', 'post_content' => '<p>Withdrawn archive text.</p>', 'post_status' => 'draft'], true);
+$withdrawArchiveRoute = '/ai-disclosure/v1/posts/' . $withdrawArchiveId;
+$archiveAssessment = aid_rest('POST', $withdrawArchiveRoute . '/assessment', $declaration)->get_data();
+aid_check(aid_rest('POST', $withdrawArchiveRoute . '/withdrawal', ['revision' => $archiveAssessment['revision'], 'replaces' => $archiveAssessment['record_id'], 'reason' => 'Inventory fixture withdrawn.'])->get_status() === 200, 'Create withdrawn inventory fixture');
+$firstPage = aid_inventory(['limit' => 2])->get_data();
+$newAfterBoundary = wp_insert_post(['post_title' => 'Created during inventory', 'post_status' => 'draft'], true);
+$allItems = $firstPage['items'];
+$page = $firstPage;
+$pages = 0;
+while ($page['next_after'] !== null) {
+    aid_check(++$pages < 100, 'Inventory cursor makes progress');
+    $page = aid_inventory(['limit' => 2, 'after' => $page['next_after'], 'through_id' => $firstPage['through_id']])->get_data();
+    aid_check(count($page['items']) <= 2 && $page['through_id'] === $firstPage['through_id'], 'Bounded pages preserve scan boundary');
+    $allItems = array_merge($allItems, $page['items']);
+}
+$indexed = array_column($allItems, null, 'id');
+aid_check(count($indexed) === count($allItems), 'Inventory has no duplicate IDs');
+aid_check(!isset($indexed[$newAfterBoundary]), 'New posts do not extend an in-progress scan');
+aid_check($indexed[$historical]['decision'] === 'unassessed', 'Historical content retains unknown assessment state');
+aid_check($indexed[$historical]['status'] === 'publish' && \AiDisclosure\WordPress\notice($historical) === '', 'Published legacy content is found without an invented label');
+aid_check($indexed[$mediaArchive]['supported_text'] === false, 'Unsupported archived media remains visible as a coverage gap');
+aid_check($indexed[$withdrawArchiveId]['decision'] === 'withdrawn', 'Withdrawn archive cannot look approved');
+aid_check($indexed[$id]['decision'] === 'disclose', 'Recorded publication is distinguished from gaps');
+aid_check(!str_contains(wp_json_encode($allItems), 'WORDPRESS_PRIVATE_EVIDENCE'), 'Inventory does not return evidence bodies');
+aid_check(aid_rest('GET', '/ai-disclosure/v1/posts/' . $historical . '/assessment')->get_data()['recorded'] === false, 'Inventory does not create assessment records');
+$author = wp_create_user('inventory-author', wp_generate_password(), 'inventory-author@example.invalid');
+(new WP_User($author))->set_role('author');
+$ownDraft = wp_insert_post(['post_title' => 'Author own draft', 'post_status' => 'draft', 'post_author' => $author], true);
+wp_set_current_user($author);
+$emptyAuthorizedPage = aid_inventory(['limit' => 1])->get_data();
+aid_check($emptyAuthorizedPage['items'] === [] && $emptyAuthorizedPage['next_after'] !== null, 'Empty authorized page can still have a continuation cursor');
+$authorPage = aid_inventory(['after' => $ownDraft - 1, 'through_id' => $ownDraft])->get_data();
+aid_check(array_column($authorPage['items'], 'id') === [$ownDraft], 'Author can discover own content');
+wp_set_current_user(1);
+
+$failInventory = static function ($query) {
+    return str_contains($query, "post_type IN ('post', 'page')") ? 'SELECT ID FROM ai_disclosure_missing_table' : $query;
+};
+$previousErrors = $wpdb->suppress_errors(true);
+add_filter('query', $failInventory);
+try { $failedInventory = aid_inventory(); }
+finally { remove_filter('query', $failInventory); $wpdb->suppress_errors($previousErrors); }
+aid_check($failedInventory->get_status() === 503, 'Database failure must not masquerade as an empty completed inventory');
+
 $uiClassic = wp_insert_post(['post_title' => 'Classic editor fixture', 'post_content' => 'Fictional editor test text.', 'post_status' => 'draft'], true);
 $uiBlock = wp_insert_post(['post_title' => 'Block editor fixture', 'post_content' => '<!-- wp:paragraph --><p>Fictional block editor text.</p><!-- /wp:paragraph -->', 'post_status' => 'draft'], true);
 update_post_meta($uiClassic, 'aid_classic_fixture', true);

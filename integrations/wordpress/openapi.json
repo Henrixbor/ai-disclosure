@@ -374,6 +374,146 @@
           }
         }
       }
+    },
+    "/ai-disclosure/v1/inventory": {
+      "get": {
+        "summary": "Inventory authorized post/page source records without changing them.",
+        "description": "Scans every post/page status, including draft, auto-draft and trash. ID cursors bound database work. Keep through_id from the first response on subsequent requests. An empty items array may still have next_after; stop only when it is null. This is not a consistent snapshot or proof of complete rendered-site coverage. Evidence bodies are omitted. Requires publish_posts or publish_pages and filters each item by edit and publication capabilities.",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "through_id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Upper ID returned by the first page. New posts beyond it require a later scan."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private bounded source inventory. All responses use private, no-store caching.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "through_id",
+                    "next_after",
+                    "policy",
+                    "coverage"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "type",
+                          "status",
+                          "title_excerpt",
+                          "revision",
+                          "supported_text",
+                          "decision"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "post",
+                              "page"
+                            ]
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "title_excerpt": {
+                            "type": "string",
+                            "description": "Plain title excerpt, at most 160 characters plus ellipsis."
+                          },
+                          "revision": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          "supported_text": {
+                            "type": "boolean"
+                          },
+                          "decision": {
+                            "type": "string",
+                            "enum": [
+                              "unassessed",
+                              "withdrawn",
+                              "disclose",
+                              "exception_declared",
+                              "no_publisher_label",
+                              "outside_declared_scope"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "through_id": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "next_after": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "policy": {
+                      "type": "string"
+                    },
+                    "coverage": {
+                      "type": "string",
+                      "const": "post-page-source-only"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {

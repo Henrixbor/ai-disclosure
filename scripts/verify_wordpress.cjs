@@ -106,9 +106,13 @@ async function main() {
       { step: 'runPHP', code: "<?php require '/wordpress/wp-load.php'; wp_set_password('" + password + "', 1);" },
     ] },
   });
+  try { await siteChecks(server.serverUrl, password); }
+  finally { await server[Symbol.asyncDispose](); }
+}
+
+async function siteChecks(base, password) {
   let browser;
   try {
-    const base = server.serverUrl;
     const result = await (await fetch(new URL('/aid-test-result.json', base))).json();
     assert.equal(result.checks, 'passed');
     const anonymous = await fetch(new URL('/?rest_route=/ai-disclosure/v1/posts/' + result.id + '/assessment', base));
@@ -139,7 +143,7 @@ async function main() {
     console.log('WordPress 7.1: publishing, amendments, stale database writers, private history/inventory, no-JS notices and feed privacy passed');
   } finally {
     if (browser) await browser.close();
-    await server[Symbol.asyncDispose]();
   }
 }
-main().catch(error => { console.error(error.message); process.exitCode = 1; });
+module.exports = { siteChecks };
+if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });

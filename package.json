@@ -7,7 +7,8 @@
     "test:browser": "node scripts/browser_smoke.cjs",
     "test:node": "node --test tests/node-publishing.cjs",
     "test:next": "node scripts/verify_next.cjs",
-    "test:wordpress": "node --experimental-wasm-jspi scripts/verify_wordpress.cjs"
+    "test:wordpress": "node --experimental-wasm-jspi scripts/verify_wordpress.cjs",
+    "test:wordpress:mysql": "node scripts/verify_wordpress_mysql.cjs"
   },
   "devDependencies": {
     "@wp-playground/cli": "3.1.53",

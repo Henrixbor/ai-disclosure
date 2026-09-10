@@ -56,15 +56,17 @@ Use short recordings showing the actual workflow and the resulting UI. Show an u
 
 ## Pilot and launch sequence
 
-Durations are scheduling estimates after the release gates pass, not promises to launch unverified features.
+Pilot evidence is an input to the stable-release decision. It cannot be required before pilots begin. Start with a versioned development candidate on isolated test sites, then use the findings and independent legal review to decide production readiness. Durations below are planning estimates once each phase's prerequisites are available.
 
 | Phase | Work | Evidence to advance |
 |---|---|---|
-| Readiness | Verify supported modes, browser behaviour, packaging and CI; review rules/claims; prepare documentation | Passing release audit with named limitations and owners |
-| Two-week pilot | Recruit up to five design partners with distinct publishing workflows; provide hands-on onboarding | At least three independently reproduced integrations; no unresolved critical defects |
-| Two-week improvement | Fix repeated onboarding friction and missing adapter coverage; obtain permission for any testimonials | Partners can publish a new item through the integrated workflow without manual label placement |
-| Public launch | Release notes, website, technical walkthrough and opt-in community posts | Install commands and demo work from a clean environment; support channel staffed |
+| Candidate readiness | Verify the selected prerelease's modes, browser behaviour, packaging and CI; prepare the review packet and test-site instructions | Exact candidate and limitations documented; safe test-site setup and an owner for unresolved findings |
+| Two-week pilot | Recruit up to five design partners with distinct publishing workflows; obtain authorized access to isolated test sites and established content facts; provide hands-on onboarding | At least three independently reproduced integrations, with failures and unsupported surfaces recorded |
+| Two-week improvement and review | Fix observed defects and onboarding friction; complete independent legal review of the intended launch use; obtain permission for any testimonials | Partners can publish a new supported item in their test workflow without manual label placement; no unresolved critical defect; required legal changes implemented and verified |
+| Stable release and public launch | Complete the full release audit, publish the verified stable artifacts and approved website, and prepare the technical walkthrough and opt-in community posts | Independent legal and deployment evidence supports the advertised scope; all required release gates are met; public audience resolved; installation verified from a clean environment; support channel staffed |
 | Following month | Measure retention and repeated integrations; prioritise one additional adapter | Evidence of recurring use, not only repository stars |
+
+The public alpha.3 prerelease provides an installable candidate for this process. It does not establish that candidate readiness has been assessed for a particular partner, that a pilot has occurred, or that a live production deployment is approved. Synthetic fixtures and this product's own demonstration site do not count as the three independent integrations. Request the first representative pilot site and its publishing workflow from Henrixbor; do not choose an unrelated repository or fabricate customer evidence.
 
 No outreach messages, social posts, paid campaigns or marketplace submissions are sent by this document. Drafts below are preparation for explicit publication decisions.
 

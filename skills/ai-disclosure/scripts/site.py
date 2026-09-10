@@ -25,7 +25,7 @@ STYLE = """/* AI Disclosure: local, visible without JavaScript. */
 .aid-notice:focus-visible{outline:3px solid #145acc;outline-offset:3px}
 .aid-media{position:relative;display:block}.aid-media>.aid-notice{position:absolute;inset:.6rem auto auto .6rem;z-index:2}
 .aid-media>img,.aid-media>video{display:block;max-width:100%;height:auto}
-.aid-player{background:#f3f6f1;border:1px solid #b7c5bc;padding:.6rem;color:#183d33}.aid-player[data-aid-player="audio"]{padding-top:3rem}.aid-player video{display:block;width:100%;max-height:75vh;background:#111}.aid-player-controls{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.6rem 0}.aid-player button{font:inherit;color:inherit;background:white;border:1px solid #55776c;border-radius:.25rem;padding:.3rem .7rem}.aid-player button:focus-visible,.aid-player input:focus-visible{outline:3px solid #145acc;outline-offset:2px}.aid-player button:disabled{opacity:.6}.aid-player input{flex:1;min-width:100px;accent-color:#254c3c}.aid-player [role=status]{font-size:.875rem}.aid-media:fullscreen{background:#111;margin:0;display:grid;align-content:center}.aid-media:fullscreen .aid-notice{position:absolute;top:1rem;left:1rem}.aid-player [hidden]{display:none!important}
+.aid-player{background:#f3f6f1;border:1px solid #b7c5bc;padding:.6rem;color:#183d33}.aid-player[data-aid-player="audio"]{padding-top:3rem}.aid-player video{display:block;width:100%;max-height:75vh;background:#111}.aid-player-controls{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.6rem 0}.aid-player button{font:inherit;color:inherit;background:white;border:1px solid #55776c;border-radius:.25rem;padding:.3rem .7rem}.aid-player button:focus-visible,.aid-player input:focus-visible{outline:3px solid #145acc;outline-offset:2px}.aid-player button:disabled{opacity:.6}.aid-player input{flex:1;min-width:100px;accent-color:#254c3c}.aid-player [role=status]{font-size:.875rem}.aid-media:fullscreen{background:#111;margin:0;display:grid;align-content:center}.aid-media:fullscreen .aid-notice{position:absolute;top:1rem;left:1rem}.aid-player [data-aid-cue]{white-space:pre-line}.aid-player [data-aid-cue]:empty{display:none}.aid-player select{font:inherit;max-width:100%}.aid-player [hidden]{display:none!important}
 @media(forced-colors:active){.aid-notice{color:CanvasText;background:Canvas;border-color:CanvasText}}
 """
 
@@ -151,8 +151,17 @@ def player_markup(item, region, descendants, root, relative):
     if not source or media.end is None:
         raise ValueError("Media needs an explicit src and closing tag")
     local_asset(root, relative, source)
-    if any(e.tag in {"source", "track"} for e in media.descendants()):
-        raise ValueError("This player adapter does not yet preserve source alternatives or caption tracks")
+    if any(e.tag == "source" for e in media.descendants()):
+        raise ValueError("This player adapter needs one explicit src; source alternatives require separate integration")
+    tracks = [e for e in media.descendants() if e.tag == "track"]
+    if any(e.attrs.get("kind", "subtitles") not in {"captions", "subtitles"} for e in tracks):
+        raise ValueError("Only caption/subtitle tracks are supported by these controls")
+    if sum("default" in e.attrs for e in tracks) > 1:
+        raise ValueError("Choose at most one default caption/subtitle track")
+    for track in tracks:
+        if not all(track.attrs.get(key) for key in ("src", "srclang", "label")):
+            raise ValueError("Caption/subtitle tracks need local src, srclang and label")
+        local_asset(root, relative, track.attrs["src"])
     audible = kind == "audio" or item.get("audio_deepfake") is True
     if kind == "video" and item.get("audio_deepfake") is None:
         raise ValueError("Declare whether the video's audio is a deepfake using audio_deepfake")
@@ -162,18 +171,25 @@ def player_markup(item, region, descendants, root, relative):
     if notice:
         local_asset(root, relative, notice)
     esc = lambda value: html.escape(value, quote=True)
+    track_markup = "".join('<track' + "".join(' ' + key + '="' + esc(track.attrs[key]) + '"'
+                            for key in ("src", "kind", "srclang", "label") if key in track.attrs)
+                           + (' default' if "default" in track.attrs else '') + '>' for track in tracks)
+    caption_controls = ('<label>Captions <select data-aid-captions disabled><option value="-1">Off</option>'
+                        + "".join('<option value="' + str(index) + '"' + (' selected' if "default" in track.attrs else '')
+                                  + '>' + esc(track.attrs["label"]) + '</option>' for index, track in enumerate(tracks))
+                        + '</select></label>' if tracks else '')
     poster = media.attrs.get("poster")
     poster_attribute = (' poster="' + esc(poster) + '"') if poster and kind == "video" else ""
     title = esc(media.attrs.get("aria-label") or ("Video recording" if kind == "video" else "Audio recording"))
     markup = ('<div class="aid-player" data-aid-player="' + kind + '" data-source="' + esc(source)
               + '" data-notice="' + esc(notice) + '" role="group" aria-label="' + title + '">'
-              + '<' + kind + ' data-aid-content preload="none" playsinline disablepictureinpicture' + poster_attribute + '></' + kind + '>'
+              + '<' + kind + ' data-aid-content preload="none" playsinline disablepictureinpicture' + poster_attribute + '>' + track_markup + '</' + kind + '>'
               + '<audio data-aid-notice hidden preload="none"></audio>'
               + '<div class="aid-player-controls"><button type="button" data-aid-play disabled>Play</button>'
               + '<input data-aid-seek type="range" min="0" max="100" step="0.1" value="0" aria-label="Playback position" disabled>'
               + '<button type="button" data-aid-mute aria-pressed="false" disabled>Mute</button>'
               + ('<button type="button" data-aid-fullscreen hidden>Fullscreen</button>' if kind == "video" else '')
-              + '</div><div data-aid-status role="status" aria-live="polite"></div>'
+              + caption_controls + '</div><div data-aid-cue aria-live="off"></div><div data-aid-status role="status" aria-live="polite"></div>'
               + '<noscript>Playback requires JavaScript to present the AI disclosure with this recording.</noscript></div>')
     return media.start, media.end, markup
 
@@ -346,8 +362,12 @@ def build(root, manifest, output):
     output.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".ai-disclosure-", dir=output.parent))
     try:
-        shutil.copytree(root, stage, dirs_exist_ok=True,
+        shutil.copytree(root, stage, dirs_exist_ok=True, symlinks=True,
                         ignore=lambda directory, names: [name for name in names if name.startswith(".")])
+        # Assess the copied snapshot, not a possibly changed original build directory.
+        result, edits = plan(stage, manifest)
+        if not result["ready_to_render"]:
+            return result
         for relative, source in edits.items():
             (stage / relative).write_text(source, encoding="utf-8")
         (stage / "ai-disclosure.css").write_text(STYLE, encoding="utf-8")

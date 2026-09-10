@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/ai-disclosure/scripts"))
 from test_tooling import load, ROOT
@@ -95,6 +96,17 @@ class PublishingTests(unittest.TestCase):
                 self.facts()
                 self.assertFalse(publisher.build(self.root, self.manifest, self.output)["ready_to_render"])
                 self.assertFalse(self.output.exists())
+
+    def test_content_changed_during_staging_is_not_published(self):
+        self.facts()
+        copytree = publisher.shutil.copytree
+        def changed_copy(*args, **kwargs):
+            self.write(ARTICLE.replace("A new park.", "Changed during copy."))
+            return copytree(*args, **kwargs)
+        with patch.object(publisher.shutil, "copytree", side_effect=changed_copy):
+            self.assertFalse(publisher.build(self.root, self.manifest, self.output)["ready_to_render"])
+        self.assertFalse(self.output.exists())
+        self.assertFalse(list(self.base.glob(".ai-disclosure-*")))
 
     def test_existing_output_is_preserved(self):
         self.facts()
@@ -201,6 +213,31 @@ class PublishingTests(unittest.TestCase):
         self.assertNotIn('<audio src=', rendered)
         self.assertIn('<noscript>', rendered)
         self.assertTrue((self.output / "ai-disclosure-players.js").is_file())
+
+    def test_caption_tracks_preserved_and_versioned(self):
+        self.media_fixture()
+        (self.root / "captions.vtt").write_text("WEBVTT\n\n00:00.000 --> 00:01.000\nCaption\n")
+        source = (self.root / "index.html").read_text().replace('</audio>',
+                  '<track kind="captions" src="captions.vtt" srclang="en" label="English" default></audio>')
+        (self.root / "index.html").write_text(source)
+        self.facts({"kind": "audio"})
+        result = publisher.build(self.root, self.manifest, self.output)
+        self.assertTrue(result["ready_to_render"])
+        rendered = (self.output / "index.html").read_text()
+        self.assertIn('src="captions.vtt"', rendered)
+        self.assertIn('data-aid-captions', rendered)
+        (self.root / "captions.vtt").write_text("WEBVTT\n\n00:00.000 --> 00:01.000\nChanged caption\n")
+        self.assertFalse(publisher.plan(self.root, self.manifest)[0]["ready_to_render"])
+
+    def test_unsupported_track_is_reported_instead_of_stripped(self):
+        self.media_fixture()
+        (self.root / "captions.vtt").write_text("WEBVTT\n")
+        path = self.root / "index.html"
+        path.write_text(path.read_text().replace('</audio>',
+            '<track kind="descriptions" src="captions.vtt" srclang="en" label="Description"></audio>'))
+        self.facts({"kind": "audio"})
+        self.assertFalse(publisher.build(self.root, self.manifest, self.output)["ready_to_render"])
+        self.assertFalse(self.output.exists())
 
     def test_required_spoken_notice_missing_blocks_build(self):
         for kind in ("audio", "video"):

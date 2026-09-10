@@ -17,6 +17,8 @@
     const seek = root.querySelector('[data-aid-seek]');
     const status = root.querySelector('[data-aid-status]');
     const mute = root.querySelector('[data-aid-mute]');
+    const captions = root.querySelector('[data-aid-captions]');
+    const cue = root.querySelector('[data-aid-cue]');
     const fullscreen = root.querySelector('[data-aid-fullscreen]');
     if (!player || !notice || !play || !seek || !status || !mute) return;
     const abort = new AbortController();
@@ -37,6 +39,8 @@
       player.removeAttribute('src'); notice.removeAttribute('src');
       player.load(); notice.load();
       play.disabled = true; seek.disabled = true; mute.disabled = true;
+      if (captions) captions.disabled = true;
+      if (cue) cue.textContent = "";
       instances.delete(root);
     }
     function invalidate() {
@@ -109,6 +113,25 @@
         });
         on(document, 'fullscreenchange', () => { fullscreen.textContent = document.fullscreenElement === frame ? 'Exit fullscreen' : 'Fullscreen'; });
       }
+    }
+    if (captions && cue) {
+      captions.disabled = false;
+      const tracks = [...player.textTracks];
+      function showCues() {
+        const selected = tracks[Number(captions.value)];
+        cue.textContent = player.tagName === 'AUDIO' && selected
+          ? [...(selected.activeCues || [])].map(c => c.text).join('\n') : '';
+      }
+      function chooseCaptions() {
+        tracks.forEach((track, index) => {
+          track.mode = index === Number(captions.value) ? (player.tagName === 'AUDIO' ? 'hidden' : 'showing') : 'disabled';
+        });
+        showCues();
+      }
+      tracks.forEach(track => on(track, 'cuechange', showCues));
+      root.querySelectorAll('track').forEach(track => on(track, 'error', () => message('The selected captions could not load.')));
+      on(captions, 'change', chooseCaptions);
+      chooseCaptions();
     }
     update();
   }

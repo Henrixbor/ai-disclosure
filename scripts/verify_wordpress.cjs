@@ -10,6 +10,9 @@ async function editorChecks(browser, base, result, password) {
   const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultTimeout(10000);
+  // WordPress preferences hydrate asynchronously and can reopen this guide.
+  await page.addLocatorHandler(page.getByRole('dialog').filter({ hasText: 'Welcome to the editor' }),
+    async dialog => { await dialog.getByRole('button', { name: 'Close', exact: true }).click(); });
   try {
     await page.goto(new URL('/wp-login.php', base).href);
     await page.locator('#user_login').fill('admin');
@@ -17,9 +20,7 @@ async function editorChecks(browser, base, result, password) {
     await Promise.all([page.waitForURL('**/wp-admin/**'), page.locator('#wp-submit').click()]);
     for (const [mode, id] of [['classic', result.classic_id], ['block', result.block_id]]) {
       await page.goto(new URL('/wp-admin/post.php?post=' + id + '&action=edit', base).href);
-      if (mode === 'block') {
-        await page.getByRole('dialog').filter({ hasText: 'Welcome to the editor' }).getByRole('button', { name: 'Close', exact: true }).click();
-      } else {
+      if (mode === 'classic') {
         const textMode = page.locator('#content-html');
         if (await textMode.count()) await textMode.click();
       }

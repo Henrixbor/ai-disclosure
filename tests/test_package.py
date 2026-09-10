@@ -36,6 +36,26 @@ class PackagingTests(unittest.TestCase):
                                   cwd=root, capture_output=True, text=True)
             self.assertEqual(proc.returncode, 0, proc.stderr)
 
+    def test_plugin_archive_reuses_skill_and_has_consistent_manifests(self):
+        payload = packager.package(kind="plugin")
+        self.assertEqual(payload, packager.package(kind="plugin"))
+        with tempfile.TemporaryDirectory() as tmp:
+            with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+                self.assertEqual(len(archive.namelist()), 12)
+                archive.extractall(tmp)
+            root = Path(tmp) / "ai-disclosure"
+            codex = json.loads((root / ".codex-plugin/plugin.json").read_text())
+            claude = json.loads((root / ".claude-plugin/plugin.json").read_text())
+            self.assertEqual(codex["name"], root.name)
+            self.assertEqual(codex["version"], claude["version"])
+            self.assertEqual(codex["skills"], claude["skills"])
+            skill = root / "skills/ai-disclosure"
+            self.assertEqual((skill / "SKILL.md").read_bytes(), (packager.SOURCE / "SKILL.md").read_bytes())
+            self.assertEqual((skill / "assets/players.js").read_bytes(), (packager.SOURCE / "assets/players.js").read_bytes())
+            proc = subprocess.run([sys.executable, str(skill / "scripts/site.py"), "--help"],
+                                  cwd=tmp, capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+
     def test_missing_reference_cannot_be_packaged(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError):

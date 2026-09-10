@@ -1,0 +1,30 @@
+{
+  "name": "ai-disclosure",
+  "version": "0.1.0-alpha.1",
+  "description": "Minimal AI transparency disclosures with evidence-backed content records and publishing tools. Development release, not legal certification.",
+  "author": {
+    "name": "Henrixbor",
+    "url": "https://github.com/Henrixbor"
+  },
+  "homepage": "https://github.com/Henrixbor/ai-disclosure",
+  "repository": "https://github.com/Henrixbor/ai-disclosure",
+  "license": "MIT",
+  "keywords": [
+    "ai-act",
+    "transparency",
+    "disclosure"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "AI Disclosure",
+    "shortDescription": "Minimal AI notices for websites and products.",
+    "longDescription": "Inspect content, assess declared facts, implement appropriate disclosures and verify supported surfaces. Requires project integration for future content. Development release; does not certify legal compliance.",
+    "developerName": "Henrixbor",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": [
+      "Fix this site's AI disclosures with minimal appropriate notices."
+    ],
+    "brandColor": "#183D33"
+  }
+}

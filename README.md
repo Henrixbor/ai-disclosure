@@ -2,7 +2,7 @@
 
 Minimal AI disclosure guidance for coding agents. Ask an agent to inspect a site, apply appropriate notices and verify the result without adding unnecessary banners.
 
-**Status: local development release.** Includes one portable skill, dependency-free assessment and HTML publishing tools, and a project installer. Article/image output is implemented; an experimental local audio/video player is in development, and a local chat wrapper renders interaction notices. General runtime adapters remain incomplete. No hosted service or published package yet. Rules have not been reviewed by counsel. Assessment output is not legal certification.
+**Status: local development release.** Includes one portable skill, dependency-free assessment and HTML publishing tools, and a project installer. Article/image output is implemented; an experimental local audio/video player is in development, and a local chat wrapper renders interaction notices. General runtime adapters remain incomplete. Versioned development archives are available through GitHub releases; no hosted compliance service is provided. Rules have not been reviewed by counsel. Assessment output is not legal certification.
 
 ## Install into a project
 
@@ -42,7 +42,7 @@ An arbitrary session cannot reliably discover an unpublished or uninstalled repo
 | Claude Code projects | Install under `.claude/skills/ai-disclosure`. |
 | Personal sessions | Users can copy the same folder to `~/.agents/skills/` or `~/.claude/skills/`, respectively. Local installation does not automatically propagate to cloud sessions. |
 | Public repository | Publish a stable repository URL, concise README, skill metadata and examples. Search ranking and implicit selection are not guarantees. |
-| Plugins / marketplaces | Later package this same skill for each host and follow its distribution/submission process. Listing requires separate work and acceptance; it is not implemented here. |
+| Plugins / marketplaces | A dual-host plugin archive packages this same skill with validated Codex and Claude manifests. Official marketplace listing requires separate submission and acceptance. See [distribution](docs/distribution.md). |
 | Framework / CMS templates | Later bundle supported publishing integrations and the skill so new projects start with them. |
 
 Discovery sources checked 2026-09-10: [Codex skill documentation](https://learn.chatgpt.com/docs/build-skills), [Claude Code skill documentation](https://code.claude.com/docs/en/skills). Both support descriptions for implicit selection. Neither makes a public Git repository automatically available to every session.
@@ -62,3 +62,5 @@ To create a standalone skill archive, run `python3 scripts/package_skill.py --ou
 Tests cover declared decisions, uncertainty, stale review, role gaps, invalid input, CLI exit codes and installation preservation. They do not test real model skill selection or a production site's visual/legal compliance.
 
 See [the skill](skills/ai-disclosure/SKILL.md), [assessment input](skills/ai-disclosure/references/manifest.md), and [research brief](research/product-feasibility.md).
+
+The [distribution guide](docs/distribution.md) covers standalone skill and plugin archives, versioning and verification. Development releases are explicitly marked as prereleases.

@@ -1,0 +1,18 @@
+{
+  "name": "ai-disclosure",
+  "version": "0.1.0-alpha.1",
+  "description": "Minimal AI transparency disclosures with evidence-backed content records and publishing tools. Development release, not legal certification.",
+  "author": {
+    "name": "Henrixbor",
+    "url": "https://github.com/Henrixbor"
+  },
+  "homepage": "https://github.com/Henrixbor/ai-disclosure",
+  "repository": "https://github.com/Henrixbor/ai-disclosure",
+  "license": "MIT",
+  "keywords": [
+    "ai-act",
+    "transparency",
+    "disclosure"
+  ],
+  "skills": "./skills/"
+}

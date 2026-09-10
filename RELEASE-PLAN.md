@@ -31,6 +31,8 @@ Unreleased main: portable document export is implemented and browser-tested offl
 
 A [legal review package](docs/legal-review.md) maps the implemented decisions and sample outputs to specific questions for a qualified reviewer. The PDF fingerprint checker does not automate legal judgment. The public website-access question remains pending; the site stays owner-private.
 
+Unreleased WordPress cache adapter: committed assessment records, amendments and withdrawals automatically clear WP Super Cache through its full-clear API. Fresh MySQL/browser checks passed with the SHA-pinned official 3.1.3 plugin: genuine anonymous cache hits, changed notices, withdrawal and first assessment of cached legacy content, with private evidence absent. Coverage is single-site PHP serving with cache rebuild disabled; other modes/providers, CDNs, storage failures and concurrent cache writers remain deployment work. The five-step skill is unchanged.
+
 Unreleased JavaScript integration: a dependency-free Node client calls the same Python renderer through bounded stdin/stdout JSON at publishing time. It supports inspection, rendering and portable export; stale facts and failed operations hold updates. It does not add per-visitor processing or a framework/CMS transaction layer. The skill entrypoint remains unchanged.
 
 The Next.js App Router example now connects preparation to the real build configuration. Its verifier exercises a production static export, no-JavaScript direct visits, client navigation/history, private-output checks, and a stale-content build in an isolated copy. It demonstrates one framework's static publication path; production CMS transactions, broader route inventories and customer adoption remain open.

@@ -14,6 +14,7 @@ require_once __DIR__ . '/editor.php';
 require_once __DIR__ . '/withdrawal.php';
 require_once __DIR__ . '/inventory.php';
 require_once __DIR__ . '/publication.php';
+require_once __DIR__ . '/cache.php';
 
 function supported($post): bool { return $post && in_array($post->post_type, ['post', 'page'], true); }
 function snapshot($post): array {

@@ -128,6 +128,40 @@ aid_check($storageFailure->get_status() === 503, 'Database failure is not report
 aid_check(aid_rest('GET', $reviewRoute)->get_data()['assessment']['record_id'] === $amended->get_data()['record_id'], 'Failed database write preserves active record');
 aid_check($amendmentEvents === 1, 'Failed database write emits no committed event');
 
+// Withdrawal retains evidence but invalidates publication permission.
+$withdrawRoute = '/ai-disclosure/v1/posts/' . $reviewed . '/withdrawal';
+$beforeWithdraw = aid_rest('GET', $reviewRoute)->get_data();
+$rawBeforeWithdraw = \AiDisclosure\WordPress\record_for($reviewed, \AiDisclosure\WordPress\snapshot(get_post($reviewed)));
+$withdrawBody = ['revision' => $beforeWithdraw['revision'], 'replaces' => $beforeWithdraw['assessment']['record_id'], 'reason' => 'Origin evidence was found to be unreliable.'];
+wp_set_current_user(0);
+aid_check(aid_rest('POST', $withdrawRoute, $withdrawBody)->get_status() >= 400, 'Withdrawal requires authentication');
+wp_set_current_user(1);
+aid_check(aid_rest('POST', $withdrawRoute, $withdrawBody)->get_status() === 409, 'Published article must be made draft before withdrawal');
+wp_update_post(['ID' => $reviewed, 'post_status' => 'draft']);
+aid_check(aid_rest('POST', $withdrawRoute, array_merge($withdrawBody, ['reason' => ' ']))->get_status() === 400, 'Withdrawal requires meaningful reason');
+$withdrawEvents = 0;
+add_action('ai_disclosure_assessment_withdrawn', function () use (&$withdrawEvents) { $withdrawEvents++; });
+$withdrawn = aid_rest('POST', $withdrawRoute, $withdrawBody);
+aid_check($withdrawn->get_status() === 200 && $withdrawn->get_data()['decision'] === 'withdrawn', 'Draft assessment can be withdrawn');
+aid_check(aid_rest('POST', $withdrawRoute, $withdrawBody)->get_data() === $withdrawn->get_data(), 'Withdrawal retry returns same audit record');
+aid_check($withdrawEvents === 1, 'Withdrawal event emitted once');
+aid_check(aid_rest('POST', '/wp/v2/posts/' . $reviewed, ['status' => 'publish'])->get_status() === 409, 'Withdrawn assessment cannot publish');
+aid_check(is_wp_error(wp_update_post(['ID' => $reviewed, 'post_status' => 'publish'], true)), 'Native path rejects withdrawn version');
+aid_check(aid_rest('POST', $reviewRoute, ['role' => 'publisher', 'facts' => $facts])->get_status() === 409, 'Old facts cannot silently reactivate withdrawal');
+$withdrawArchive = aid_rest('GET', '/ai-disclosure/v1/posts/' . $reviewed . '/assessments/' . $withdrawBody['replaces']);
+aid_check($withdrawArchive->get_data() === $beforeWithdraw['assessment'], 'Withdrawal preserves exact prior record');
+// Simulate publication already past its precheck when withdrawal committed.
+$wpdb->update($wpdb->posts, ['post_status' => 'publish'], ['ID' => $reviewed]);
+clean_post_cache($reviewed);
+wp_cache_set(\AiDisclosure\WordPress\record_key($reviewed, $withdrawBody['revision']), $rawBeforeWithdraw, 'options');
+do_action('wp_after_insert_post', $reviewed, get_post($reviewed), true, null);
+aid_check(get_post_status($reviewed) === 'draft', 'Post-write check returns raced publication to draft');
+$restored = aid_rest('POST', $reviewRoute, ['role' => 'publisher', 'facts' => $facts,
+    'replaces' => $withdrawn->get_data()['record_id'], 'amendment_reason' => 'Re-established the source evidence.']);
+aid_check($restored->get_status() === 200 && $restored->get_data()['decision'] === 'disclose', 'Explicit reassessment can restore identical newly established facts');
+aid_check(aid_rest('POST', $withdrawRoute, $withdrawBody)->get_status() === 409, 'Old withdrawal retry cannot invalidate restored assessment');
+aid_check(!is_wp_error(wp_update_post(['ID' => $reviewed, 'post_status' => 'publish'], true)), 'Explicitly restored assessment permits publication');
+
 // Exercise an actual database CAS with two writers holding the same old value.
 $casKey = 'ai_disclosure_cas_fixture';
 $previous = ['token' => 'original'];

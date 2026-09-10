@@ -1,6 +1,6 @@
 # WordPress adapter development
 
-This directory contains an **experimental text publishing plugin** and native PHP assessment engine. WordPress 7.1/PHP 8.3 tests cover REST/native updates, editor controls, explicit amendments, stale-writer rejection, superseded-policy scheduling checks, public content/excerpts/feeds and private evidence. It is not a production compliance plugin: broader surfaces, revocation, historical inventory and legal review remain open.
+This directory contains an **experimental text publishing plugin** and native PHP assessment engine. WordPress 7.1/PHP 8.3 tests cover REST/native updates, editor controls, explicit amendments, stale-writer rejection, superseded-policy scheduling checks, public content/excerpts/feeds and private evidence. It is not a production compliance plugin: broader surfaces, historical inventory and legal review remain open.
 
 Activation adds publication gates for ordinary posts and pages. New publication and edits to published content through the supported routes need evidence recorded first. Unsupported body media, dynamic blocks and shortcodes are held. Test on an isolated copy before activation on an existing site; this can interrupt workflows that have not been integrated. Activation does not retroactively classify or rewrite historical posts.
 
@@ -55,9 +55,17 @@ The server assesses the replacement facts before changing anything. It archives 
 
 An authorized caller can read a retained record at `GET /wp-json/ai-disclosure/v1/posts/{id}/assessments/{record_id}`. This retrieves one archived snapshot, not an unbounded history list; unknown or other-post IDs return 404. A snapshot is saved before the database replacement, so its presence alone does not prove an amendment committed. The active record and its `supersedes` chain establish the committed state. The same capability checks and private/no-store headers apply. The current record remains available through the singular assessment endpoint.
 
-Rejected or unresolved amendments leave the active assessment unchanged; they do not revoke it. If its evidence is no longer valid and a supported replacement cannot be established, withdraw the content through WordPress's normal draft/unpublish workflow while resolving the issue. A dedicated revocation UI is not implemented.
+Rejected or unresolved amendments leave the active assessment unchanged; they do not revoke it. Use explicit withdrawal when the evidence is invalid.
 
-Committed first records and amendments clear WordPress's post/object cache and emit `ai_disclosure_assessment_recorded` or `ai_disclosure_assessment_amended` with post ID and content revision. Connect external page/CDN caches to these hooks and verify invalidation before adoption. No private facts are included in the event arguments. A newly required label must not remain absent from a previously cached page.
+## Withdraw invalid facts
+
+First change the post to **Draft** and save it using WordPress's normal controls. Load that saved text in the AI disclosure panel, enter the reason and choose **Withdraw assessment**. This retains the historical facts and prior record but marks the current assessment `withdrawn`. It cannot authorize publication. The panel clears the human-review selection. Re-establish the facts and use **Record assessment** with a reason to restore approval; reusing old facts without explicitly replacing the withdrawn record is rejected.
+
+Agents use `POST /wp-json/ai-disclosure/v1/posts/{id}/withdrawal` with `revision`, `replaces` (the current record ID) and `reason` (nonblank, at most 1000 UTF-8 bytes). Only the exact saved draft revision can be withdrawn. The response is a private record, including `decision: "withdrawn"`; its facts are historical, not approved. GET may still report `recorded: true` because the record exists. Check the decision, not just existence. Authentication, limits and cache headers match the assessment endpoint. Identical retries return the same record; stale IDs, missing assessments or non-draft posts return 409. Storage failures return 503 and require reading the current state before retrying.
+
+The replacement uses the same byte-exact database comparison as amendments and checks draft status in that database write. A post-write core hook rereads the assessment after clearing the process-local cache and returns a raced publication to draft if withdrawal committed after its precheck. This is corrective, not a transaction covering publication and all readers; production concurrency and cache behavior still need verification. Withdrawal does not delete evidence or unpublish old CDN copies.
+
+Committed first records and amendments clear WordPress's post/object cache and emit `ai_disclosure_assessment_recorded` or `ai_disclosure_assessment_amended` with post ID and content revision. Connect external page/CDN caches to these hooks and verify invalidation before adoption. Committed withdrawals emit `ai_disclosure_assessment_withdrawn` with the same arguments. No private facts are included in the event arguments. A newly required label must not remain absent from a previously cached page.
 
 ## Presentation and coverage
 
@@ -69,7 +77,7 @@ Body media, shortcodes and unsupported/dynamic blocks are rejected by this text 
 
 ## Run the live tests
 
-From the repository root, install development dependencies with `npm ci --ignore-scripts`, install Chromium with `npx playwright install chromium`, then run `npm run test:wordpress`. Playground boots a disposable WordPress 7.1/PHP 8.3 site, activates the actual plugin, exercises native/REST operations and verifies public output in Chromium with JavaScript disabled. It also logs into disposable admin credentials to exercise the classic and block editor panels, stale text, recording, review amendments and actual editor publication. It closes the test server afterward. Production HTTPS/application-password configuration, other roles, themes and editor versions still need deployment-specific verification.
+From the repository root, install development dependencies with `npm ci --ignore-scripts`, install Chromium with `npx playwright install chromium`, then run `npm run test:wordpress`. Playground boots a disposable WordPress 7.1/PHP 8.3 site, activates the actual plugin, exercises native/REST operations and verifies public output in Chromium with JavaScript disabled. It also logs into disposable admin credentials to exercise the classic and block editor panels, stale text, recording, review amendments, draft withdrawal/restoration and actual editor publication. It closes the test server afterward. Production HTTPS/application-password configuration, other roles, themes and editor versions still need deployment-specific verification.
 
 The root development package pins Express's `qs` dependency to 6.16.0 for the patched query parser. This override belongs to the Playground test server; no npm packages ship in the WordPress plugin.
 
@@ -101,7 +109,7 @@ The verifier compares complete results across 9,253 inputs: origin and scope com
 
 ## Remaining integration contract
 
-Before production use, complete revocation, historical inventory, applicable additional surfaces and independent legal review. Test the exact target WordPress/database/theme combination; the current live fixture uses Playground's SQLite runtime, including a real database compare-and-swap check.
+Before production use, complete historical inventory, applicable additional surfaces and independent legal review. Test the exact target WordPress/database/theme combination; the current live fixture uses Playground's SQLite runtime, including a real database compare-and-swap check.
 
 Publication gates must be verified against REST/block-editor updates, classic-editor updates, scheduled posts and supported programmatic publication. WordPress offers a [REST pre-insert filter](https://developer.wordpress.org/reference/hooks/rest_pre_insert_this-post_type/) and an [insert short-circuit filter](https://developer.wordpress.org/reference/hooks/wp_insert_post_empty_content/), but neither alone establishes coverage of every publishing path. Do not advertise that coverage until tested against a running WordPress instance.
 

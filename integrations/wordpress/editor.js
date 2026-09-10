@@ -6,6 +6,7 @@ wp.domReady(() => {
   const field = name => panel.querySelector(`[data-aid-field="${name}"]`);
   const load = panel.querySelector('[data-aid-load]');
   const save = panel.querySelector('[data-aid-save]');
+  const withdraw = panel.querySelector('[data-aid-withdraw]');
   const fields = panel.querySelector('[data-aid-fields]');
   const status = panel.querySelector('[data-aid-status]');
   let loaded = null;
@@ -36,6 +37,7 @@ wp.domReady(() => {
   function toggle() {
     panel.querySelector('[data-aid-responsibility]').hidden = !field('review').checked;
     panel.querySelector('[data-aid-amendment]').hidden = !loaded?.assessment;
+    withdraw.hidden = !loaded?.assessment || loaded.assessment.decision === 'withdrawn';
   }
   function populate(info) {
     const facts = info.assessment?.facts ?? {};
@@ -43,7 +45,7 @@ wp.domReady(() => {
     field('origin').value = facts.origin ?? 'unknown';
     for (const name of ['applicable', 'public_interest']) field(name).value = typeof facts[name] === 'boolean' ? String(facts[name]) : 'unknown';
     field('evidence').value = facts.evidence ?? '';
-    field('review').checked = facts.review?.substantive_human_review === true && facts.review?.revision === info.revision;
+    field('review').checked = info.assessment?.decision !== 'withdrawn' && facts.review?.substantive_human_review === true && facts.review?.revision === info.revision;
     field('responsible_entity').value = field('review').checked ? facts.review.responsible_entity : '';
     field('amendment_reason').value = '';
     toggle();
@@ -66,8 +68,16 @@ wp.domReady(() => {
     if (JSON.stringify(text) !== JSON.stringify(source())) throw new Error('The text changed while loading. Load the current text again.');
     loaded = { ...info, source: text };
     populate(info);
-    message(info.supported_text ? (info.assessment ? 'Current assessment loaded. Changes require a reason.' : 'No assessment recorded for this text. Supply established facts below.')
+    message(info.supported_text ? (info.assessment ? (info.assessment.decision === 'withdrawn' ? 'This assessment was withdrawn. Establish facts again and provide a reason to restore it.' : 'Current assessment loaded. Changes require a reason.') : 'No assessment recorded for this text. Supply established facts below.')
       : 'This text contains markup or media the current adapter cannot cover. A separate integration is required.', !info.supported_text);
+  }));
+  withdraw.addEventListener('click', () => perform(async () => {
+    if (!loaded?.assessment || JSON.stringify(source()) !== JSON.stringify(loaded.source)) throw new Error('Load the current saved text before withdrawing.');
+    if (!field('amendment_reason').value.trim()) throw new Error('Give a reason for withdrawing this assessment.');
+    const result = await request('withdrawal', { revision: loaded.revision, replaces: loaded.assessment.record_id, reason: field('amendment_reason').value });
+    loaded.assessment = result;
+    populate(loaded);
+    message('Assessment withdrawn. This version cannot be republished until explicitly reassessed.');
   }));
   field('review').addEventListener('change', toggle);
   save.addEventListener('click', () => perform(async () => {
@@ -90,7 +100,7 @@ wp.domReady(() => {
     if (loaded.assessment) {
       const prior = { ...loaded.assessment.facts };
       for (const name of ['id', 'kind', 'revision']) delete prior[name];
-      if (JSON.stringify(canonical(prior)) !== JSON.stringify(canonical(facts))) {
+      if (loaded.assessment.decision === 'withdrawn' || JSON.stringify(canonical(prior)) !== JSON.stringify(canonical(facts))) {
         if (!field('amendment_reason').value.trim()) throw new Error('Give a reason for changing this assessment.');
         payload.replaces = loaded.assessment.record_id;
         payload.amendment_reason = field('amendment_reason').value;
@@ -101,7 +111,7 @@ wp.domReady(() => {
       loaded = null;
       throw new Error('The earlier text was assessed, but the editor has changed. Load the current text again.');
     }
-    loaded.assessment = { record_id: result.record_id, facts };
+    loaded.assessment = { record_id: result.record_id, decision: result.decision, facts };
     toggle();
     message(result.decision === 'disclose' ? 'Assessment recorded. This version requires a visible notice when published.' : 'Assessment recorded. No extra text notice is required by these declared facts.');
   }));

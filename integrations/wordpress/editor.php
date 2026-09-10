@@ -24,7 +24,7 @@ add_action('add_meta_boxes', static function ($type, $post) {
         echo '<label class="aid-editor-check"><input type="checkbox" data-aid-field="review"> This exact text has received substantive human review</label>';
         echo '<label data-aid-responsibility hidden>Person or organisation with editorial responsibility<input type="text" data-aid-field="responsible_entity"></label>';
         echo '<label data-aid-amendment hidden>Reason for changing this assessment<textarea rows="2" data-aid-field="amendment_reason"></textarea></label>';
-        echo '<p><button type="button" class="button button-primary" data-aid-save>Record assessment</button></p></fieldset>';
+        echo '<p><button type="button" class="button button-primary" data-aid-save>Record assessment</button> <button type="button" class="button" data-aid-withdraw hidden>Withdraw assessment</button></p></fieldset>';
         echo '<p role="status" aria-live="polite" data-aid-status>Load the current text to begin.</p>';
         echo '<noscript><p>These controls require JavaScript. The authenticated assessment API is also available.</p></noscript></div>';
     }, $type, 'normal', 'high', ['__block_editor_compatible_meta_box' => true]);

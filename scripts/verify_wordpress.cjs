@@ -50,6 +50,23 @@ async function editorChecks(browser, base, result, password) {
       await panel.locator('[data-aid-save]').click();
       await page.waitForFunction(() => document.querySelector('[data-aid-status]').textContent.includes('No extra text notice'));
       assert.ok(!(await page.locator('[data-aid-status]').innerText()).includes('compliant'));
+      // Save the assessed text as a draft, withdraw through the panel, then restore explicitly.
+      if (mode === 'classic') {
+        await Promise.all([page.waitForURL('**/post.php?**'), page.locator('#save-post').click()]);
+      } else {
+        await page.evaluate(() => wp.data.dispatch('core/editor').savePost());
+      }
+      await panel.locator('[data-aid-load]').click();
+      await page.waitForFunction(() => !document.querySelector('[data-aid-fields]').disabled);
+      await panel.locator('[data-aid-field="amendment_reason"]').fill('Withdraw fixture evidence for the editor test.');
+      await panel.locator('[data-aid-withdraw]').click();
+      await page.waitForFunction(() => document.querySelector('[data-aid-status]').textContent.includes('Assessment withdrawn.'));
+      assert.ok(!(await panel.locator('[data-aid-field="review"]').isChecked()), 'Withdrawn review must not be silently reselected');
+      await panel.locator('[data-aid-field="review"]').check();
+      await panel.locator('[data-aid-field="responsible_entity"]').fill('Fictional review fixture');
+      await panel.locator('[data-aid-field="amendment_reason"]').fill('Re-establish the fixture facts after withdrawal.');
+      await panel.locator('[data-aid-save]').click();
+      await page.waitForFunction(() => document.querySelector('[data-aid-status]').textContent.includes('No extra text notice'));
       // Publish through the actual editor after recording, not a direct API shortcut.
       if (mode === 'classic') {
         await Promise.all([page.waitForURL('**/post.php?**'), page.locator('#publish').click()]);
@@ -62,7 +79,7 @@ async function editorChecks(browser, base, result, password) {
       const published = await (await fetch(new URL('/?rest_route=/wp/v2/posts/' + id, base))).json();
       assert.equal(published.status, 'publish', 'Editor publication must succeed with the assessed text');
       assert.ok(!published.content.rendered.includes('data-ai-disclosure='), 'Current declared review needs no extra label');
-      console.log('Authenticated ' + mode + ' editor: stale text held, assessment recorded, review amended, native publication passed');
+      console.log('Authenticated ' + mode + ' editor: stale text held, assessment recorded, review amended, withdrawn and restored, native publication passed');
     }
   } catch (error) {
     console.error(JSON.stringify(await page.evaluate(() => ({

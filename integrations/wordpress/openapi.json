@@ -296,6 +296,84 @@
           }
         }
       }
+    },
+    "/ai-disclosure/v1/posts/{id}/withdrawal": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "post": {
+        "summary": "Withdraw the saved draft assessment while retaining its audit history.",
+        "description": "Requires draft status and exact saved revision. Repeating the same replaced ID and reason returns the same withdrawn record. Stale requests return 409. Explicit assessment amendment is required to restore publication permission.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "revision",
+                  "replaces",
+                  "reason"
+                ],
+                "properties": {
+                  "revision": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "replaces": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Nonblank; at most 1000 UTF-8 bytes."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Private withdrawn record. Historical facts are retained, not approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivateRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -470,7 +548,8 @@
             "type": "string"
           },
           "decision": {
-            "type": "string"
+            "type": "string",
+            "description": "withdrawn invalidates publication approval; retained facts are historical."
           },
           "facts": {
             "type": "object",

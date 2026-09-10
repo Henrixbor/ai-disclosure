@@ -11,6 +11,7 @@ namespace AiDisclosure\WordPress;
 if (!defined('ABSPATH')) exit;
 require_once __DIR__ . '/policy.php';
 require_once __DIR__ . '/editor.php';
+require_once __DIR__ . '/withdrawal.php';
 
 function supported($post): bool { return $post && in_array($post->post_type, ['post', 'page'], true); }
 function snapshot($post): array {
@@ -29,12 +30,14 @@ function record_for(int $id, array $source): ?array {
 }
 function record_id(array $record): string { return hash('sha256', wp_json_encode($record)); }
 function audit_key(int $id, string $record_id): string { return 'ai_disclosure_audit_' . $id . '_' . $record_id; }
-function replace_record(string $key, array $previous, array $replacement): bool {
+function replace_record(string $key, array $previous, array $replacement, ?int $draft_id = null): bool {
     global $wpdb;
     // WordPress's update_option has no compare-and-swap argument. Compare the full
     // stored value so a writer using an old record cannot overwrite a newer one.
+    $draft_guard = $draft_id === null ? '' : $wpdb->prepare(
+        " AND EXISTS (SELECT 1 FROM {$wpdb->posts} WHERE ID = %d AND post_status = 'draft')", $draft_id);
     $changed = $wpdb->query($wpdb->prepare(
-        "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND HEX(option_value) = HEX(%s)",
+        "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND HEX(option_value) = HEX(%s)" . $draft_guard,
         maybe_serialize($replacement), $key, maybe_serialize($previous)));
     wp_cache_delete($key, 'options');
     if ($changed === false) throw new \RuntimeException('Assessment storage update could not be confirmed');
@@ -113,7 +116,7 @@ function assessment_route($request) {
     $key = record_key($post->ID, $item->revision);
     $existing = get_option($key);
     if ($existing) {
-        $same = ($existing['facts'] ?? null) === $record['facts'] && ($existing['policy'] ?? '') === $record['policy'];
+        $same = ($existing['status'] ?? null) === $record['status'] && ($existing['facts'] ?? null) === $record['facts'] && ($existing['policy'] ?? '') === $record['policy'];
         $retry = $amending && $same && ($existing['supersedes'] ?? null) === $body->replaces
             && ($existing['amendment_reason'] ?? null) === $body->amendment_reason;
         if ($retry || (!$amending && $same)) {
@@ -198,7 +201,8 @@ function prospective(array $data): array {
         'excerpt' => wp_unslash($data['post_excerpt'] ?? '')];
 }
 function publication_ready(int $id, array $source): bool {
-    return $id > 0 && supported_text($source) && record_for($id, $source) !== null;
+    return $id > 0 && supported_text($source) && in_array(record_for($id, $source)['status'] ?? null,
+        ['disclose', 'exception_declared', 'no_publisher_label', 'outside_declared_scope'], true);
 }
 add_filter('wp_insert_post_empty_content', static function ($empty, $data) {
     if (in_array($data['post_type'] ?? 'post', ['post', 'page'], true)

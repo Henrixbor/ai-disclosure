@@ -12,7 +12,7 @@ Objective: finish the minimal agent-friendly AI disclosure product, publish it o
 | Exports and provenance | Original media bytes are preserved during staging; provider duties are kept separate | Direct media downloads, transcript/document exports, machine-readable provider marking and provenance validation |
 | Minimal host integration | One five-step portable skill; project installer; standalone and dual-host archives; validated plugin schemas | Official catalog submissions and host-selection evaluation; no claim of automatic discovery in uninstalled sessions |
 | Tests and safe operation | Python 3.9/3.13 Linux/macOS CI; browser job; local suite now 46 tests | Final verification against deployed customer integrations and remaining modalities |
-| Website | Working static demo and owner-private Sites preview; project identity in `.openai/hosting.json` | Refresh website to latest capabilities and verify public launch deployment |
+| Website | Refreshed [owner-private Sites website](https://henrixbor-ai-disclosure.henrixbor.chatgpt.site) with alpha.2 downloads, catalog commands and current scope; deployment succeeded and returned current content | Decide public audience for launch; current access remains owner-only |
 | Repository and release | Public [Henrixbor/ai-disclosure](https://github.com/Henrixbor/ai-disclosure); MIT licence, contribution/security guidance; immutable alpha.1 assets downloaded and hash-matched | Complete the remaining production gates before a stable release |
 | Distribution | Real Claude catalog installation into temporary configuration, exactly one skill and no agents/hooks/servers; Codex project installer tested | Codex marketplace packaging/listing; official catalog acceptance not obtained |
 | Go-to-market | Audience, pilots, positioning, channels, metrics, operating ownership and draft launch copy in `docs/go-to-market.md` | Pilot partners, independently reproduced integrations and approved external promotion |
@@ -24,3 +24,5 @@ Objective: finish the minimal agent-friendly AI disclosure product, publish it o
 ## Completion boundary
 
 The full objective remains open. No independent legal review has been obtained, no official marketplace listing is claimed, and no tool result certifies all website law. Complete the remaining engineering and deployment work, then audit every row with current authoritative evidence. Do not remove a requirement simply because an alpha can be published. Keep the existing Sites project; never recreate it.
+
+Website deployment evidence: source `eedd40aacce1db75e4d550416085865f3a502877`, Sites version 2, successful deployment and authenticated HTTP 200 with current release/scope. That commit’s five CI jobs passed. No public access change has been made.

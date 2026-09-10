@@ -5,7 +5,8 @@
   "description": "Development-only browser verification for AI Disclosure; the shipped skill has no npm dependencies.",
   "scripts": {
     "test:browser": "node scripts/browser_smoke.cjs",
-    "test:node": "node --test tests/node-publishing.cjs"
+    "test:node": "node --test tests/node-publishing.cjs",
+    "test:next": "node scripts/verify_next.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"

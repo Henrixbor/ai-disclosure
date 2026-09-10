@@ -32,3 +32,5 @@ Unreleased main: portable document export is implemented and browser-tested offl
 A [legal review package](docs/legal-review.md) maps the implemented decisions and sample outputs to specific questions for a qualified reviewer. The PDF fingerprint checker does not automate legal judgment. The public website-access question remains pending; the site stays owner-private.
 
 Unreleased JavaScript integration: a dependency-free Node client calls the same Python renderer through bounded stdin/stdout JSON at publishing time. It supports inspection, rendering and portable export; stale facts and failed operations hold updates. It does not add per-visitor processing or a framework/CMS transaction layer. The skill entrypoint remains unchanged.
+
+The Next.js App Router example now connects preparation to the real build configuration. Its verifier exercises a production static export, no-JavaScript direct visits, client navigation/history, private-output checks, and a stale-content build in an isolated copy. It demonstrates one framework's static publication path; production CMS transactions, broader route inventories and customer adoption remain open.

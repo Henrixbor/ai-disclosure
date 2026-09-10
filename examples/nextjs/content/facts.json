@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "role": "publisher",
+  "items": [
+    {
+      "id": "town-news",
+      "revision": "sha256:c3feace20044f47e5310e766ec3b54c072dfbc5d619618f582bb8195605e6d8f",
+      "kind": "text",
+      "origin": "ai_generated",
+      "applicable": true,
+      "public_interest": true,
+      "evidence": "NEXTJS_FIXTURE_ORIGIN_RECORD: Authored by Codex on 2026-09-10 as fictional civic-news test content; publisher applicability and public-interest context are explicit test assumptions, not a legal conclusion about a real deployment."
+    }
+  ]
+}

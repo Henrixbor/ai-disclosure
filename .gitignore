@@ -7,3 +7,6 @@ release-site/
 node_modules/
 dist/
 release/
+examples/nextjs/.next/
+examples/nextjs/out/
+examples/nextjs/.generated/

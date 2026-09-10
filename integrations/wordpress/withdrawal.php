@@ -31,7 +31,7 @@ function withdrawal_route($request) {
     $record['actor'] = get_current_user_id();
     $record['recorded_at'] = gmdate('c');
     $auditKey = audit_key($post->ID, $record['supersedes']);
-    if (!add_option($auditKey, $existing, '', false) && get_option($auditKey) !== $existing) {
+    if (!retain_record($auditKey, $existing)) {
         return new \WP_Error('ai_disclosure_storage', 'Could not retain the previous assessment; no withdrawal applied.', ['status' => 503]);
     }
     try { $changed = replace_record(record_key($post->ID, $body->revision), $existing, $record, $post->ID); }

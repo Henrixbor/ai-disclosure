@@ -151,7 +151,7 @@ aid_check(aid_rest('POST', $reviewRoute, ['role' => 'publisher', 'facts' => $fac
 $withdrawArchive = aid_rest('GET', '/ai-disclosure/v1/posts/' . $reviewed . '/assessments/' . $withdrawBody['replaces']);
 aid_check($withdrawArchive->get_data() === $beforeWithdraw['assessment'], 'Withdrawal preserves exact prior record');
 // Simulate publication already past its precheck when withdrawal committed.
-$wpdb->update($wpdb->posts, ['post_status' => 'publish'], ['ID' => $reviewed]);
+$wpdb->query($wpdb->prepare("UPDATE {$wpdb->posts} SET post_status = %s WHERE ID = %d", 'publish', $reviewed));
 clean_post_cache($reviewed);
 wp_cache_set(\AiDisclosure\WordPress\record_key($reviewed, $withdrawBody['revision']), $rawBeforeWithdraw, 'options');
 do_action('wp_after_insert_post', $reviewed, get_post($reviewed), true, null);
@@ -170,6 +170,15 @@ aid_check(\AiDisclosure\WordPress\replace_record($casKey, $previous, ['token' =>
 aid_check(!\AiDisclosure\WordPress\replace_record($casKey, $previous, ['token' => 'stale-writer']), 'Second database writer is rejected');
 aid_check(get_option($casKey) === ['token' => 'ORIGINAL'], 'Object cache reflects the committed winner');
 delete_option($casKey);
+
+// An archive inserted by another writer must override this process's missing-key cache.
+$archiveCacheKey = 'ai_disclosure_archive_cache_fixture';
+aid_check(get_option($archiveCacheKey) === false, 'Prime missing archive cache');
+$archiveCacheValue = ['evidence' => 'Original fixture bytes'];
+$wpdb->insert($wpdb->options, ['option_name' => $archiveCacheKey, 'option_value' => maybe_serialize($archiveCacheValue), 'autoload' => 'off']);
+aid_check(\AiDisclosure\WordPress\retain_record($archiveCacheKey, $archiveCacheValue), 'Archive reuse rereads a competing committed insert');
+aid_check(!\AiDisclosure\WordPress\retain_record($archiveCacheKey, ['evidence' => 'Different bytes']), 'Different archived bytes cannot be silently reused');
+delete_option($archiveCacheKey);
 
 // Check the database state before corrective hooks, including wpdb percent escaping.
 $guarded = wp_insert_post(['post_title' => 'Guarded 50% fixture', 'post_content' => '<p>50% — café and "quotes".</p>', 'post_status' => 'draft'], true);
@@ -196,6 +205,25 @@ try { wp_update_post(['ID' => $guarded, 'post_status' => 'publish'], true); }
 finally { remove_action('pre_post_update', $withdrawBeforeWrite, 10); remove_action('post_updated', $observeWrite, 1); }
 aid_check($observedStatus === 'draft', 'Conditional publication write never exposed the withdrawn version before corrective hooks');
 
+// The core status-only publisher must obey the same assessment gate.
+$fast = wp_insert_post(['post_title' => 'Core publisher fixture', 'post_content' => '<p>50% test.</p>', 'post_status' => 'draft'], true);
+wp_publish_post($fast);
+aid_check(get_post_status($fast) === 'draft', 'Direct core publisher cannot bypass missing assessment');
+$fastRoute = '/ai-disclosure/v1/posts/' . $fast . '/assessment';
+aid_check(aid_rest('POST', $fastRoute, $declaration)->get_status() === 200, 'Assess core publisher fixture');
+wp_publish_post($fast);
+aid_check(get_post_status($fast) === 'publish' && str_contains(\AiDisclosure\WordPress\notice($fast), 'AI-generated'), 'Direct core publisher can publish assessed text');
+wp_update_post(['ID' => $fast, 'post_status' => 'draft', 'post_content' => '<p>Different source.</p>']);
+wp_publish_post($fast);
+aid_check(get_post_status($fast) === 'draft', 'Direct core publisher rejects changed unassessed content');
+aid_check(aid_rest('POST', $fastRoute, $declaration)->get_status() === 200, 'Assess changed scheduled fixture');
+wp_update_post(['ID' => $fast, 'post_status' => 'future', 'edit_date' => true,
+    'post_date' => gmdate('Y-m-d H:i:s', time() + 3600), 'post_date_gmt' => gmdate('Y-m-d H:i:s', time() + 3600)]);
+$wpdb->update($wpdb->posts, ['post_date' => gmdate('Y-m-d H:i:s', time() - 60), 'post_date_gmt' => gmdate('Y-m-d H:i:s', time() - 60)], ['ID' => $fast]);
+clean_post_cache($fast);
+do_action('publish_future_post', $fast);
+aid_check(get_post_status($fast) === 'publish', 'Due assessed post publishes through the real cron hook');
+
 // Historical discovery is bounded, private, and never guesses source facts.
 function aid_inventory(array $query = []) {
     $request = new WP_REST_Request('GET', '/ai-disclosure/v1/inventory');
@@ -212,7 +240,7 @@ foreach ([['limit' => 101], ['limit' => 0], ['after' => -1], ['after' => '1e2'],
 }
 $historical = wp_insert_post(['post_title' => 'Historical unknown origin', 'post_content' => '<p>Unclassified archive text.</p>', 'post_status' => 'draft'], true);
 // Model a publication predating activation; discovery must not relabel it.
-$wpdb->update($wpdb->posts, ['post_status' => 'publish'], ['ID' => $historical]);
+$wpdb->query($wpdb->prepare("UPDATE {$wpdb->posts} SET post_status = %s WHERE ID = %d", 'publish', $historical));
 clean_post_cache($historical);
 $mediaArchive = wp_insert_post(['post_type' => 'page', 'post_title' => 'Historical media', 'post_content' => '<img src="example.png" alt="Unknown source">', 'post_status' => 'draft'], true);
 $withdrawArchiveId = wp_insert_post(['post_title' => 'Withdrawn archive', 'post_content' => '<p>Withdrawn archive text.</p>', 'post_status' => 'draft'], true);

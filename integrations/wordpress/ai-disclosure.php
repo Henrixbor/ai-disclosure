@@ -32,6 +32,14 @@ function record_for(int $id, array $source): ?array {
 }
 function record_id(array $record): string { return hash('sha256', wp_json_encode($record)); }
 function audit_key(int $id, string $record_id): string { return 'ai_disclosure_audit_' . $id . '_' . $record_id; }
+function retain_record(string $key, array $record): bool {
+    if (add_option($key, $record, '', false)) return true;
+    // A competing insert may have won after this request cached a missing key.
+    // Re-read the committed row before distinguishing reuse from storage failure.
+    wp_cache_delete($key, 'options');
+    wp_cache_delete('notoptions', 'options');
+    return get_option($key) === $record;
+}
 function replace_record(string $key, array $previous, array $replacement, ?int $draft_id = null): bool {
     global $wpdb;
     // WordPress's update_option has no compare-and-swap argument. Compare the full
@@ -131,7 +139,7 @@ function assessment_route($request) {
             $record['supersedes'] = record_id($existing);
             $record['amendment_reason'] = $body->amendment_reason;
             $auditKey = audit_key($post->ID, $record['supersedes']);
-            if (!add_option($auditKey, $existing, '', false) && get_option($auditKey) !== $existing) {
+            if (!retain_record($auditKey, $existing)) {
                 return new \WP_Error('ai_disclosure_storage', 'Could not retain the previous assessment; no amendment applied.', ['status' => 503]);
             }
             try { $changed = replace_record($key, $existing, $record); }
@@ -231,6 +239,7 @@ foreach (['post', 'page'] as $type) {
 
 add_action('publish_future_post', static function ($id) {
     $post = get_post($id);
+    if (supported($post)) $GLOBALS['ai_disclosure_scheduled_posts'][$id] = clone $post;
     if (supported($post) && $post->post_status === 'future' && !publication_ready($id, snapshot($post))) {
         wp_update_post(['ID' => $id, 'post_status' => 'pending']);
     }

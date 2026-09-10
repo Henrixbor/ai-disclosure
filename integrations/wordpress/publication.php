@@ -32,5 +32,25 @@ add_action('pre_post_update', static function ($id, $data) {
     $GLOBALS['ai_disclosure_publication_queries'][$wpdb->remove_placeholder_escape($query)] = $wpdb->remove_placeholder_escape($guard);
 }, 1, 2);
 add_filter('query', static function ($query) {
-    return $query . ($GLOBALS['ai_disclosure_publication_queries'][$query] ?? '');
+    if (isset($GLOBALS['ai_disclosure_publication_queries'][$query])) return $query . $GLOBALS['ai_disclosure_publication_queries'][$query];
+    global $wpdb;
+    // wp_publish_post (including core cron) uses this status-only UPDATE.
+    $pattern = '/^UPDATE `' . preg_quote($wpdb->posts, '/') . '` SET `post_status` = \'publish\' WHERE `ID` = ([0-9]+)$/D';
+    if (!preg_match($pattern, $query, $matches)) return $query;
+    $id = (int) $matches[1];
+    $post = $wpdb->get_row($wpdb->prepare("SELECT ID, post_type, post_status, post_title, post_content, post_excerpt, post_date, post_date_gmt FROM {$wpdb->posts} WHERE ID = %d", $id));
+    if ($wpdb->last_error || !$post) return $query . ' AND 1 = 0';
+    if (!supported($post)) return $query;
+    $expected = $GLOBALS['ai_disclosure_scheduled_posts'][$id] ?? $post;
+    $source = snapshot($expected);
+    $record = record_for($id, $source);
+    if (!publication_ready($id, $source)) return $query . ' AND 1 = 0';
+    $guard = $wpdb->prepare(" AND EXISTS (SELECT 1 FROM {$wpdb->options} WHERE option_name = %s AND HEX(option_value) = HEX(%s))",
+        record_key($id, revision($source)), maybe_serialize($record));
+    // A status-only write must not publish text edited or a schedule cancelled
+    // after inspection. Compare the stored source and scheduling fields too.
+    foreach (['post_type', 'post_status', 'post_title', 'post_content', 'post_excerpt', 'post_date', 'post_date_gmt'] as $field) {
+        $guard .= $wpdb->prepare(" AND HEX(`$field`) = HEX(%s)", $expected->$field);
+    }
+    return $query . $wpdb->remove_placeholder_escape($guard);
 }, PHP_INT_MAX);

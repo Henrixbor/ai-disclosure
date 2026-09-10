@@ -75,4 +75,22 @@ module.exports = async function concurrencyChecks(docker, web, base) {
   assert.equal(retained.status, 'publish');
   assert.equal(retained.current.assessment.decision, 'disclose');
   console.log('Publication before withdrawal commits: draft guard rejects withdrawal and preserves the active notice decision');
+
+  const scheduled = await run('cron', 'setup');
+  const cronMarker = marker('cron', 'cron-wait');
+  const cronAfter = marker('cron', 'after-write');
+  const cron = Promise.allSettled([run('cron', 'cron-wait')]);
+  try {
+    await waitReady([cronMarker]);
+    assert.equal((await run('cron', 'cancel-withdraw')).status, 200);
+  } finally { await release([cronMarker]); }
+  try {
+    await waitReady([cronAfter]);
+    assert.equal((await run('cron', 'inspect')).status, 'draft');
+    assert.equal((await fetch(new URL('/?p=' + scheduled.id, base))).status, 404);
+  } finally { await release([cronAfter]); }
+  const cronResult = (await cron)[0];
+  if (cronResult.status === 'rejected') throw cronResult.reason;
+  assert.equal(cronResult.value.status, 'draft');
+  console.log('Cron cancellation/withdrawal race: draft and anonymous 404 verified before corrective hooks');
 };

@@ -21,6 +21,10 @@ Objective: finish the minimal, agent-friendly AI disclosure product, publish it 
 
 2026-09-10: original skill/helper prototype inspected. GitHub CLI is authenticated as Henrixbor; no remote or initial commit exists. Previous work is concrete progress (files and passing prototype tests), not a finished product. No external legal review has been obtained. Implementation and release work can proceed; avoid claiming legal certification.
 
+Later on 2026-09-10: public repository created at https://github.com/Henrixbor/ai-disclosure, initial commit 6fa984f4575d9c60bdfbc1bbc55692e5415d5135. CI run 34465220091 succeeded: Python 3.9/3.13 on Linux/macOS plus a browser job. The local suite has 26 tests. The HTML adapter now inventories, records version-bound facts, plans and stages article/image disclosures. The real demo was checked at 390px and 1440px without JavaScript. The go-to-market plan and MIT licence are in place. These checks do not establish remaining modalities, dynamic runtime coverage or legal certification.
+
+Next work: complete audio/video and live-chat presentation/integration, improve runtime/CMS adapters and export handling, package versioned downloads/plugins, broaden behavioural/browser verification, finish hosted website and conduct final release audit. Independent legal review remains unperformed; do not hide that status. Sites project identity is persisted in .openai/hosting.json; never recreate it.
+
 ## Implementation direction
 
 Keep one portable skill and a dependency-free local publishing tool. Add explicit content bindings and version detection so publishing can render minimal disclosures reliably without guessing origins from text. Let agents adapt those bindings to site structure. Begin with static HTML build output and documented framework/CMS hooks; retain all originally discussed modalities and report unintegrated surfaces honestly. Public demo and release will follow verification, not precede it.

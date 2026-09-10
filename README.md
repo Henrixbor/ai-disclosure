@@ -6,7 +6,7 @@ Minimal AI disclosure guidance for coding agents. Ask an agent to inspect a site
 
 ## Install into a project
 
-From this repository, with Python 3.9+:
+Clone [Henrixbor/ai-disclosure](https://github.com/Henrixbor/ai-disclosure). From the checkout, with Python 3.9+:
 
 ```sh
 python3 scripts/install.py --project /absolute/path/to/your-site
@@ -54,6 +54,8 @@ Release work is tracked in [the release plan](RELEASE-PLAN.md). The original sof
 ```sh
 python3 -m unittest discover -s tests -v
 ```
+
+The public [Checks workflow](https://github.com/Henrixbor/ai-disclosure/actions/workflows/checks.yml) runs Python tests on Linux/macOS and browser checks on the generated demo. For local browser checks, follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Tests cover declared decisions, uncertainty, stale review, role gaps, invalid input, CLI exit codes and installation preservation. They do not test real model skill selection or a production site's visual/legal compliance.
 

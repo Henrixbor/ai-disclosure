@@ -36,8 +36,13 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:wordpress:mysql
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify WordPress MySQL integration in three engines
+        shell: bash
+        run: |
+          for engine in chromium firefox webkit; do
+            AI_DISCLOSURE_BROWSER="$engine" npm run test:wordpress:mysql
+          done
 
   python:
     runs-on: ${{ matrix.os }}
@@ -73,8 +78,12 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run test:node
       - run: npx playwright install --with-deps chromium firefox webkit
-      - name: Verify live WordPress integration
-        run: npm run test:wordpress
+      - name: Verify live WordPress integration in three engines
+        shell: bash
+        run: |
+          for engine in chromium firefox webkit; do
+            AI_DISCLOSURE_BROWSER="$engine" npm run test:wordpress
+          done
       - name: Verify Next.js publishing integration
         run: |
           npm --prefix examples/nextjs ci --ignore-scripts --no-audit --no-fund

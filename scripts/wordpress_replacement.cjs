@@ -1,6 +1,6 @@
 'use strict';
 const assert = require('node:assert/strict');
-const { chromium } = require('playwright');
+const { engine, browserType } = require('./browser_engine.cjs');
 
 module.exports = async function replacementChecks(docker, web, base, password, archive) {
   const php = code => docker(['exec', '-i', web, 'php'], '<?php require "/wordpress/wp-load.php"; wp_set_current_user(1); ' + code);
@@ -18,7 +18,7 @@ module.exports = async function replacementChecks(docker, web, base, password, a
   // Initial CLI installation created root-owned files. Model a writable hosting
   // installation for the web upload; do not grant access outside the fixture.
   await docker(['exec', web, 'chown', '-R', 'www-data:www-data', '/var/www/html/wp-content/plugins/ai-disclosure']);
-  const browser = await chromium.launch();
+  const browser = await browserType.launch();
   const page = await browser.newPage();
   let stage = 'login';
   try {
@@ -59,7 +59,7 @@ module.exports = async function replacementChecks(docker, web, base, password, a
     assert.ok(html.includes('data-ai-disclosure="wp-' + fixture.id + '"'));
     assert.ok(html.includes('AI-modified'));
     assert.ok(!html.includes('WORDPRESS_PRIVATE_EVIDENCE'));
-    console.log('WordPress admin upload: invalid ZIP and unwritable staging rejected without changes; same-version replacement preserves activation, private records, publication gate and notice; old files removed');
+    console.log('WordPress admin upload (' + engine + '): invalid ZIP and unwritable staging rejected without changes; same-version replacement preserves activation, private records, publication gate and notice; old files removed');
   } catch (error) {
     console.error('Plugin replacement screen:', stage, new URL(page.url()).pathname, (await page.locator('body').innerText({ timeout: 2000 }).catch(() => 'unavailable')).slice(-2500));
     throw error;

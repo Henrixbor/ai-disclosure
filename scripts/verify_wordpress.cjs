@@ -3,7 +3,7 @@ const { runCLI } = require('@wp-playground/cli');
 const { readFile } = require('node:fs/promises');
 const { resolve } = require('node:path');
 const assert = require('node:assert/strict');
-const { chromium } = require('playwright');
+const { engine, browserType } = require('./browser_engine.cjs');
 const { randomBytes, createHash } = require('node:crypto');
 const wordpressPackage = require('./wordpress_package.cjs');
 
@@ -149,7 +149,7 @@ async function siteChecks(base, password) {
     const inventory = await fetch(new URL('/?rest_route=/ai-disclosure/v1/inventory', base));
     assert.ok(inventory.status >= 400);
     assert.equal(inventory.headers.get('cache-control'), 'private, no-store');
-    browser = await chromium.launch();
+    browser = await browserType.launch();
     await editorChecks(browser, base, result, password);
     for (const width of [390, 1440]) {
       const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width, height: 1000 } });
@@ -165,7 +165,7 @@ async function siteChecks(base, password) {
     const feed = await (await fetch(new URL('/?feed=rss2', base))).text();
     assert.ok(feed.includes('AI-modified'));
     assert.ok(!feed.includes('WORDPRESS_PRIVATE_EVIDENCE'));
-    console.log('WordPress 7.1: publishing, amendments, stale database writers, private history/inventory, no-JS notices and feed privacy passed');
+    console.log('WordPress 7.1 (' + engine + '): publishing, amendments, stale database writers, private history/inventory, no-JS notices and feed privacy passed');
   } finally {
     if (browser) await browser.close();
   }

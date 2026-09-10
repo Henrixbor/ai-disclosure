@@ -41,3 +41,5 @@ Each item requires unique nonempty `id`, nonempty `revision`, `kind` and `origin
 Unknown optional facts use null or omission. No extra fields are accepted: this catches misspelled decisions rather than silently applying defaults. Store fuller provenance, dates and integration coverage in the project's own content records or report. Resolve inherited collection facts into these records before assessment.
 
 This deliberately narrow tool does not infer legal facts, implement notices, inspect a site, verify exports, implement provider marking, grant a chatbot exception, or support every Article 50 case. The agent handles supported edits and documents the remaining gaps.
+
+For the experimental HTML video player, declare `audio_deepfake` (boolean): whether the video contains deepfake audio. This controls the spoken-notice requirement and is a declared fact, not an audio detector result.

@@ -9,7 +9,7 @@ POLICY = "eu-article50-publisher-prototype-2026-09-10"
 KINDS = {"text", "image", "audio", "video", "code", "chatbot", "other"}
 ORIGINS = {"human", "ai_generated", "ai_modified", "unknown"}
 FIELDS = {"id", "revision", "kind", "origin", "applicable", "evidence",
-          "public_interest", "deepfake", "creative_work", "review"}
+          "public_interest", "deepfake", "creative_work", "review", "audio_deepfake"}
 
 
 def nonempty(value):
@@ -36,7 +36,7 @@ def validate(data):
         seen.add(item["id"])
         if item["kind"] not in KINDS or item["origin"] not in ORIGINS:
             raise ValueError("Unsupported kind or origin: " + item["id"])
-        for key in ("applicable", "public_interest", "deepfake", "creative_work"):
+        for key in ("applicable", "public_interest", "deepfake", "creative_work", "audio_deepfake"):
             if item.get(key) is not None and type(item[key]) is not bool:
                 raise ValueError(key + " must be boolean or null")
         if "evidence" in item and not nonempty(item["evidence"]):

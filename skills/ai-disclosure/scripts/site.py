@@ -11,6 +11,7 @@ import re
 import shutil
 import sys
 import tempfile
+from urllib.parse import unquote, urlsplit
 
 from assess import assess
 
@@ -23,6 +24,7 @@ STYLE = """/* AI Disclosure: local, visible without JavaScript. */
 .aid-notice:focus-visible{outline:3px solid #145acc;outline-offset:3px}
 .aid-media{position:relative;display:block}.aid-media>.aid-notice{position:absolute;inset:.6rem auto auto .6rem;z-index:2}
 .aid-media>img,.aid-media>video{display:block;max-width:100%;height:auto}
+.aid-player{background:#f3f6f1;border:1px solid #b7c5bc;padding:.6rem;color:#183d33}.aid-player[data-aid-player="audio"]{padding-top:3rem}.aid-player video{display:block;width:100%;max-height:75vh;background:#111}.aid-player-controls{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.6rem 0}.aid-player button{font:inherit;color:inherit;background:white;border:1px solid #55776c;border-radius:.25rem;padding:.3rem .7rem}.aid-player button:focus-visible,.aid-player input:focus-visible{outline:3px solid #145acc;outline-offset:2px}.aid-player button:disabled{opacity:.6}.aid-player input{flex:1;min-width:100px;accent-color:#254c3c}.aid-player [role=status]{font-size:.875rem}.aid-media:fullscreen{background:#111;margin:0;display:grid;align-content:center}.aid-media:fullscreen .aid-notice{position:absolute;top:1rem;left:1rem}.aid-player [hidden]{display:none!important}
 @media(forced-colors:active){.aid-notice{color:CanvasText;background:Canvas;border-color:CanvasText}}
 """
 
@@ -95,11 +97,91 @@ def nearest_binding(element):
     return None
 
 
+def local_asset(root, page, url):
+    """Resolve public local assets without network access or escaping the public root."""
+    parsed = urlsplit(url)
+    if parsed.scheme or parsed.netloc or not parsed.path or "\\" in url:
+        raise ValueError("Media requires a local public asset: " + url)
+    decoded = unquote(parsed.path)
+    path = (root / decoded.lstrip("/") if decoded.startswith("/")
+            else root / Path(page).parent / decoded)
+    if root not in path.resolve().parents or any(p.is_symlink() for p in (path, *path.parents)):
+        raise ValueError("Media path escapes public input or uses a symlink")
+    if not path.is_file() or any(part.startswith(".") for part in path.relative_to(root).parts):
+        raise ValueError("Media file missing or excluded from public output: " + url)
+    return path
+
+
+def media_dependencies(root, page, region, cache):
+    urls = set()
+    for element in (region, *region.descendants()):
+        if nearest_binding(element) is not region:
+            continue
+        if element.tag in {"img", "video", "audio", "source", "track"}:
+            for attribute in ("src", "poster", "data-ai-notice-src"):
+                if element.attrs.get(attribute):
+                    urls.add(element.attrs[attribute])
+            if "srcset" in element.attrs:
+                for candidate in element.attrs["srcset"].split(","):
+                    parts = candidate.strip().split()
+                    if not parts or len(parts) > 2 or parts[0].startswith("data:"):
+                        raise ValueError("Use local, explicit srcset assets")
+                    urls.add(parts[0])
+    dependencies = []
+    for url in sorted(urls):
+        path = local_asset(root, page, url)
+        if path not in cache:
+            digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            cache[path] = digest.hexdigest()
+        dependencies.append({"url": url, "sha256": cache[path]})
+    return dependencies
+
+
+def player_markup(item, region, descendants, root, relative):
+    kind = item["kind"]
+    media = [e for e in descendants if e.tag in {"audio", "video"}]
+    if region.tag != "figure" or "aid-media" not in region.attrs.get("class", "").split() or len(media) != 1 or media[0].tag != kind:
+        raise ValueError("Media needs figure.aid-media with one matching audio/video element")
+    media = media[0]
+    source = media.attrs.get("src")
+    if not source or media.end is None:
+        raise ValueError("Media needs an explicit src and closing tag")
+    local_asset(root, relative, source)
+    if any(e.tag in {"source", "track"} for e in media.descendants()):
+        raise ValueError("This player adapter does not yet preserve source alternatives or caption tracks")
+    audible = kind == "audio" or item.get("audio_deepfake") is True
+    if kind == "video" and item.get("audio_deepfake") is None:
+        raise ValueError("Declare whether the video's audio is a deepfake using audio_deepfake")
+    notice = media.attrs.get("data-ai-notice-src", "")
+    if audible and not notice:
+        raise ValueError("Synthetic audio needs a local spoken disclosure in data-ai-notice-src")
+    if notice:
+        local_asset(root, relative, notice)
+    esc = lambda value: html.escape(value, quote=True)
+    poster = media.attrs.get("poster")
+    poster_attribute = (' poster="' + esc(poster) + '"') if poster and kind == "video" else ""
+    title = esc(media.attrs.get("aria-label") or ("Video recording" if kind == "video" else "Audio recording"))
+    markup = ('<div class="aid-player" data-aid-player="' + kind + '" data-source="' + esc(source)
+              + '" data-notice="' + esc(notice) + '" role="group" aria-label="' + title + '">'
+              + '<' + kind + ' data-aid-content preload="none" playsinline disablepictureinpicture' + poster_attribute + '></' + kind + '>'
+              + '<audio data-aid-notice hidden preload="none"></audio>'
+              + '<div class="aid-player-controls"><button type="button" data-aid-play disabled>Play</button>'
+              + '<input data-aid-seek type="range" min="0" max="100" step="0.1" value="0" aria-label="Playback position" disabled>'
+              + '<button type="button" data-aid-mute aria-pressed="false" disabled>Mute</button>'
+              + ('<button type="button" data-aid-fullscreen hidden>Fullscreen</button>' if kind == "video" else '')
+              + '</div><div data-aid-status role="status" aria-live="polite"></div>'
+              + '<noscript>Playback requires JavaScript to present the AI disclosure with this recording.</noscript></div>')
+    return media.start, media.end, markup
+
+
 def inventory(root):
     root = root.resolve()
     if not root.is_dir():
         raise ValueError("Input root must be an existing public HTML build directory")
-    documents, records, gaps, ignored = {}, [], [], []
+    documents, records, gaps, ignored, assets = {}, [], [], [], {}
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
             raise ValueError("Symlinks are not supported in the public input: " + str(path))
@@ -119,10 +201,17 @@ def inventory(root):
                 if element.end is None:
                     raise ValueError("Unclosed bound region in " + relative)
                 fragment = source[element.start:element.end]
+                try:
+                    dependencies = media_dependencies(root, relative, element, assets)
+                except ValueError as error:
+                    dependencies = []
+                    gaps.append({"file": relative, "id": binding, "reason": str(error)})
+                if dependencies:
+                    fragment += "\n" + json.dumps(dependencies, sort_keys=True)
                 revision = "sha256:" + hashlib.sha256(fragment.encode()).hexdigest()
                 owned_slots = [(a, b) for a, b, parent in doc.slots if nearest_binding(parent) is element]
                 records.append({"id": binding, "revision": revision, "file": relative,
-                                "tag": element.tag, "slots": len(owned_slots)})
+                                "tag": element.tag, "slots": len(owned_slots), "assets": dependencies})
             if element.tag not in CANDIDATES:
                 continue
             if element.attrs.get("data-ai-ignore") == "decorative" and element.tag == "img":
@@ -148,6 +237,7 @@ def inventory(root):
 
 
 def plan(root, manifest):
+    root = root.resolve()
     if root.resolve() in manifest.resolve().parents:
         raise ValueError("Keep the private manifest outside the public input directory")
     docs, found = inventory(root)
@@ -186,9 +276,11 @@ def plan(root, manifest):
                     continue
                 descendants = list(element.descendants())
                 if item["kind"] in {"audio", "video"}:
-                    found["gaps"].append({"file": relative, "id": key,
-                                         "reason": "Media playback/audible disclosure integration requires verification; not built by this adapter yet"})
-                    continue
+                    try:
+                        replacements.append(player_markup(item, element, descendants, root, relative))
+                    except ValueError as error:
+                        found["gaps"].append({"file": relative, "id": key, "reason": str(error)})
+                        continue
                 if item["kind"] == "image":
                     images = [e for e in descendants if e.tag == "img"]
                     if (element.tag != "figure" or len(images) != 1
@@ -216,7 +308,9 @@ def plan(root, manifest):
         if not match:
             found["gaps"].append({"file": relative, "reason": "HTML document needs an explicit head closing tag"})
         else:
-            source = source[:match.start()] + '<link rel="stylesheet" href="' + css_url + '">\n' + source[match.start():]
+            player_script = ('<script defer src="' + "../" * depth + 'ai-disclosure-players.js"></script>\n'
+                             if 'data-aid-player="' in source else '')
+            source = source[:match.start()] + '<link rel="stylesheet" href="' + css_url + '">\n' + player_script + source[match.start():]
         edits[relative] = source
     result["inventory"] = found
     result["ready_to_render"] = not (found["gaps"] or result["role_gaps"] or any(
@@ -244,6 +338,8 @@ def build(root, manifest, output):
         for relative, source in edits.items():
             (stage / relative).write_text(source, encoding="utf-8")
         (stage / "ai-disclosure.css").write_text(STYLE, encoding="utf-8")
+        if any('data-aid-player="' in source for source in edits.values()):
+            shutil.copyfile(Path(__file__).resolve().parents[1] / "assets/players.js", stage / "ai-disclosure-players.js")
         # Evidence belongs outside the public directory: never publish private manifest facts.
         os.rename(stage, output)
     finally:

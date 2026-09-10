@@ -12,7 +12,7 @@ SOURCE = ROOT / "skills/ai-disclosure"
 
 def package(source=SOURCE):
     required = {"SKILL.md", "LICENSE", "references/rules.md", "references/manifest.md",
-                "references/publishing.md", "scripts/assess.py", "scripts/site.py"}
+                "references/publishing.md", "scripts/assess.py", "scripts/site.py", "assets/players.js"}
     if any(p.is_symlink() for p in source.rglob("*")):
         raise ValueError("Skill packages must not contain symlinks")
     for name in required:

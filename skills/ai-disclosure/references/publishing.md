@@ -1,6 +1,6 @@
 # HTML publishing adapter
 
-This adapter renders local, static article and image disclosures. Video/audio playback, chatbot widgets, canvas and external frames still require dedicated integration; builds report these gaps rather than claim coverage. Use the customer's existing build output as input and deploy only the new output after browser verification.
+This adapter renders local, static article and image disclosures. An experimental local audio/video player is also available, with the limitations below. Chatbot widgets, canvas and external frames still require dedicated integration; builds report these gaps rather than claim coverage. Use the customer's existing build output as input and deploy only the new output after browser verification.
 
 ## Bind once in the source template
 
@@ -55,3 +55,13 @@ JSON evidence goes to stdout; redirect it to a private CI artifact outside publi
 For static exports (including frameworks or CMSs that produce HTML), add bindings to the existing templates and run record/plan/build between the original build and deployment. Generation jobs provide facts; pure layout builds must not silently re-attest content history.
 
 Server-rendered, dynamic and personalised sites need equivalent calls in their content pipeline and disclosure output in their templates, plus runtime verification. This static adapter is not a drop-in runtime for those sites. Keep unsupported routes in the report until integrated.
+
+## Experimental local media playback
+
+Wrap one local `<audio>` or `<video>` in `figure.aid-media`, with an ID and disclosure slot before the media. Supply an explicit local `src`, a closing tag, and `data-ai-notice-src="notice.wav"` for audio deepfakes. Video facts must declare `audio_deepfake` as true or false. A required spoken notice must be an intelligible, accurate recording in the audience's language; this tool checks its presence and revision, not its words or audibility.
+
+The generated player holds the content source until its spoken notice finishes. A notice loading failure prevents content playback. Visible labels remain in the player frame, including its fullscreen view. Without JavaScript the label remains and playback is disabled. Permit the local player script under the site's CSP. Changing configuration invalidates a mounted player; render a fresh version-bound fragment instead.
+
+This is an experimental adapter, not production media coverage. Caption tracks and alternative sources are currently rejected, not stripped. Downloads, direct asset URLs, external players, live streams, picture-in-picture, exported clips and people joining midway need separate solutions. Do not use it where those surfaces or accessibility needs remain unresolved. Playback sequencing tests use silent test files and do not establish the adequacy of an actual spoken disclosure.
+
+Asset revisions include locally referenced media, posters and notices. Remote assets, missing files and paths escaping the public root are unresolved. Replacing media bytes invalidates the old manifest even when HTML is unchanged. Freeze the source build during inventory, recording and staging.

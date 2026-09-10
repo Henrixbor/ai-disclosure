@@ -19,7 +19,7 @@ class PackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with zipfile.ZipFile(io.BytesIO(first)) as archive:
-                self.assertEqual(len(archive.namelist()), 7)
+                self.assertEqual(len(archive.namelist()), 8)
                 self.assertTrue(all(name.startswith("ai-disclosure/") and ".." not in name.split("/") for name in archive.namelist()))
                 archive.extractall(root)
             skill = root / "ai-disclosure"

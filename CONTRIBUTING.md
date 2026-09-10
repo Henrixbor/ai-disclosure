@@ -9,3 +9,5 @@ Run `python3 -m unittest discover -s tests -v`. For UI changes, run `npm ci --ig
 Add behavioural tests for changed decisions, evidence invalidation and publication outcomes. Avoid tests that merely copy the implementation's text. Provider marking, arbitrary runtime surfaces and export handling require separate evidence; a passing manifest test is insufficient.
 
 Contributions to original project code and documentation are under the MIT licence. Preserve attribution and third-party licence boundaries. Maintain source links and the documented support matrix.
+
+Media mechanics: build fresh fixtures with `python3 scripts/build_media_fixture.py`, then run `node scripts/browser_media.cjs`. The runner serves them locally on port 4174 and stops its server. Fixtures are silent, so these checks do not validate spoken-notice wording or intelligibility.

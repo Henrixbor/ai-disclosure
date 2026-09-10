@@ -54,3 +54,8 @@ jobs:
             sleep 1
           done
           npm run test:browser
+
+      - name: Verify experimental media playback
+        run: |
+          python3 scripts/build_media_fixture.py
+          node scripts/browser_media.cjs

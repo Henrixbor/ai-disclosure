@@ -19,6 +19,7 @@ class PublishingTests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.root = self.base / "public"
         self.root.mkdir()
+        (self.root / "park.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"><title>Test artwork</title></svg>')
         self.manifest = self.base / "facts.json"
         self.output = self.base / "published"
         self.write(ARTICLE)
@@ -77,7 +78,7 @@ class PublishingTests(unittest.TestCase):
     def test_unbound_media_inside_article_is_detected(self):
         self.write(ARTICLE.replace('</article>', '<img src="fake.jpg" alt="News photo"></article>'))
         found = publisher.inventory(self.root)[1]
-        self.assertEqual(found["gaps"][0]["tag"], "img")
+        self.assertTrue(any(gap.get("tag") == "img" for gap in found["gaps"]))
 
     def test_decorative_exclusion_is_explicit(self):
         self.write(ARTICLE + '<img src="icon.svg" alt="" data-ai-ignore="decorative">')
@@ -149,6 +150,60 @@ class PublishingTests(unittest.TestCase):
         facts_path.write_text('{}')
         with self.assertRaises(ValueError):
             publisher.record(self.root, self.root / "facts.json", facts_path)
+
+    def test_replaced_media_bytes_invalidate_unchanged_html(self):
+        self.write(IMAGE)
+        self.facts()
+        before = (self.root / "index.html").read_bytes()
+        (self.root / "park.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"><title>Different picture</title></svg>')
+        result = publisher.build(self.root, self.manifest, self.output)
+        self.assertEqual((self.root / "index.html").read_bytes(), before)
+        self.assertFalse(result["ready_to_render"])
+        self.assertFalse(self.output.exists())
+
+    def test_external_and_missing_media_do_not_get_verified_revisions(self):
+        for url in ('https://example.com/park.svg', '../private.svg', 'missing.svg'):
+            with self.subTest(url=url):
+                self.write(IMAGE.replace('park.svg', url))
+                self.assertTrue(publisher.inventory(self.root)[1]["gaps"])
+
+    def media_fixture(self, kind="audio", notice=True):
+        (self.root / "recording.wav").write_bytes(b"test recording")
+        (self.root / "notice.wav").write_bytes(b"test notice")
+        attr = ' data-ai-notice-src="notice.wav"' if notice else ''
+        self.write('<figure class="aid-media" data-ai-content="recording"><!-- ai-disclosure -->'
+                   + '<' + kind + ' src="recording.wav"' + attr + '></' + kind + '></figure>')
+        self.facts({"kind": kind, "audio_deepfake": True})
+
+    def test_audio_build_defers_content_until_runtime_disclosure(self):
+        self.media_fixture()
+        result = publisher.build(self.root, self.manifest, self.output)
+        self.assertTrue(result["ready_to_render"])
+        rendered = (self.output / "index.html").read_text()
+        self.assertIn('data-source="recording.wav"', rendered)
+        self.assertIn('data-notice="notice.wav"', rendered)
+        self.assertNotIn('<audio src=', rendered)
+        self.assertIn('<noscript>', rendered)
+        self.assertTrue((self.output / "ai-disclosure-players.js").is_file())
+
+    def test_required_spoken_notice_missing_blocks_build(self):
+        for kind in ("audio", "video"):
+            with self.subTest(kind=kind):
+                self.media_fixture(kind, notice=False)
+                self.assertFalse(publisher.build(self.root, self.manifest, self.output)["ready_to_render"])
+                self.assertFalse(self.output.exists())
+
+    def test_video_audio_context_must_be_declared(self):
+        self.media_fixture("video")
+        data = json.loads(self.manifest.read_text())
+        del data["items"][0]["audio_deepfake"]
+        self.manifest.write_text(json.dumps(data))
+        self.assertFalse(publisher.build(self.root, self.manifest, self.output)["ready_to_render"])
+
+    def test_replacing_spoken_notice_invalidates_revision(self):
+        self.media_fixture()
+        (self.root / "notice.wav").write_bytes(b"different notice")
+        self.assertFalse(publisher.build(self.root, self.manifest, self.output)["ready_to_render"])
 
 
 if __name__ == "__main__":

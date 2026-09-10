@@ -28,3 +28,5 @@ Next work: complete audio/video and live-chat presentation/integration, improve 
 ## Implementation direction
 
 Keep one portable skill and a dependency-free local publishing tool. Add explicit content bindings and version detection so publishing can render minimal disclosures reliably without guessing origins from text. Let agents adapt those bindings to site structure. Begin with static HTML build output and documented framework/CMS hooks; retain all originally discussed modalities and report unintegrated surfaces honestly. Public demo and release will follow verification, not precede it.
+
+Current development evidence: 34 Python tests pass locally. Media revisions now include local asset bytes. Experimental audio controls passed Chromium sequencing, pause, configuration invalidation, notice-failure and no-JavaScript checks. This does not satisfy the production media gate: captions, alternate sources, exports and real spoken-notice validation remain unresolved.

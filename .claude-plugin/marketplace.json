@@ -7,11 +7,11 @@
     {
       "name": "ai-disclosure",
       "description": "Minimal AI disclosure tools and skill. Development release; not legal certification.",
-      "version": "0.1.0-alpha.2",
+      "version": "0.1.0-alpha.3",
       "source": {
         "source": "archive",
-        "url": "https://github.com/Henrixbor/ai-disclosure/releases/download/v0.1.0-alpha.2/ai-disclosure-plugin.zip",
-        "sha256": "13e102602fa652db1a44c3a5f97dee8c32f736980d6a3652e3bdd5df28ee6eb8"
+        "url": "https://github.com/Henrixbor/ai-disclosure/releases/download/v0.1.0-alpha.3/ai-disclosure-plugin.zip",
+        "sha256": "8857c1b77d0743b0b4cdc60a31fc2ef2225893da499b722cb4291643a107133e"
       }
     }
   ],

@@ -2,7 +2,7 @@
 
 Minimal AI disclosure guidance for coding agents. Ask an agent to inspect a site, apply appropriate notices and verify the result without adding unnecessary banners.
 
-**Status: local development release.** Includes one portable skill, dependency-free assessment and HTML publishing tools, and a project installer. Article/image output is implemented; an experimental local audio/video player is in development, and a local chat wrapper renders interaction notices. A shared fragment renderer supports CMS/server integration; framework-specific adapters remain incomplete. Versioned development archives are available through GitHub releases; no hosted compliance service is provided. Rules have not been reviewed by counsel; the [legal review package](docs/legal-review.md) identifies the decisions and evidence needed. Assessment output is not legal certification.
+**Status: development prerelease [0.1.0-alpha.3](https://github.com/Henrixbor/ai-disclosure/releases/tag/v0.1.0-alpha.3).** Includes one portable skill, dependency-free assessment and HTML publishing tools, and a project installer. Article/image output is implemented; an experimental local audio/video player is in development, and a local chat wrapper renders interaction notices. A shared fragment renderer supports CMS/server integration; framework-specific adapters remain incomplete. Versioned development archives are available through GitHub releases; no hosted compliance service is provided. Rules have not been reviewed by counsel; the [legal review package](docs/legal-review.md) identifies the decisions and evidence needed. Assessment output is not legal certification.
 
 ## Install into a project
 
@@ -65,9 +65,9 @@ See [the skill](skills/ai-disclosure/SKILL.md), [assessment input](skills/ai-dis
 
 The [distribution guide](docs/distribution.md) covers standalone skill and plugin archives, versioning and verification. Development releases are explicitly marked as prereleases.
 
-Unreleased main also includes portable article/image HTML export with embedded raster assets. Catalog installations remain on the versioned release shown in the distribution guide; consult the release audit for current development differences.
+Alpha.3 includes portable article/image HTML export with embedded raster assets. Catalog installations remain on the versioned release shown in the distribution guide; consult the release audit for current development differences.
 
-JavaScript publishing workers on unreleased main can use the optional [Node client](skills/ai-disclosure/references/publishing.md#javascript-publishing-client) to inspect, render and export in memory. It calls the existing Python engine at publishing time, requires no npm dependencies, and holds unresolved updates. Framework-specific installation, transactions and caching still need integration.
+JavaScript publishing workers can use the optional [Node client](skills/ai-disclosure/references/publishing.md#javascript-publishing-client) to inspect, render and export in memory. It calls the existing Python engine at publishing time, requires no npm dependencies, and holds unresolved updates. Framework-specific installation, transactions and caching still need integration.
 
 The runnable [Next.js static export example](examples/nextjs/README.md) integrates that client into the actual build configuration. It keeps facts private, emits the notice before JavaScript runs, and stops a stale-content build. This covers the demonstrated static publishing flow; it does not automatically integrate other routes or a CMS.
 

@@ -13,11 +13,15 @@ Objective: finish the minimal agent-friendly AI disclosure product, publish it o
 | Minimal host integration | One five-step portable skill; project installer; standalone and dual-host archives; validated plugin schemas | Official catalog submissions and host-selection evaluation; no claim of automatic discovery in uninstalled sessions |
 | Tests and safe operation | Python 3.9/3.13 Linux/macOS CI; browser job; Python suite and six Node publishing checks, also run from an extracted skill when Node is available | Final verification against deployed customer integrations and remaining modalities |
 | Website | Refreshed [owner-private Sites website](https://henrixbor-ai-disclosure.henrixbor.chatgpt.site) with alpha.2 downloads, catalog commands and current scope; deployment succeeded and returned current content | Decide public audience for launch; current access remains owner-only |
-| Repository and release | Public [Henrixbor/ai-disclosure](https://github.com/Henrixbor/ai-disclosure); MIT licence, contribution/security guidance; immutable alpha.1 assets downloaded and hash-matched | Complete the remaining production gates before a stable release |
+| Repository and release | Public [Henrixbor/ai-disclosure](https://github.com/Henrixbor/ai-disclosure); MIT licence, contribution/security guidance; alpha.3 assets downloaded and hash-matched | Complete the remaining production gates before a stable release |
 | Distribution | Real Claude catalog installation into temporary configuration, exactly one skill and no agents/hooks/servers; Codex project installer tested | Codex marketplace packaging/listing; official catalog acceptance not obtained |
 | Go-to-market | Audience, pilots, positioning, channels, metrics, operating ownership and draft launch copy in `docs/go-to-market.md` | Pilot partners, independently reproduced integrations and approved external promotion |
 
 ## Current release
+
+[0.1.0-alpha.3](https://github.com/Henrixbor/ai-disclosure/releases/tag/v0.1.0-alpha.3) is public at source `d1d2a0405ff9cc4e089df7f959f7ef723e62b72d`. All seven CI jobs passed. The skill, dual-host plugin and WordPress archives exactly match clean committed-source builds; anonymous public downloads and SHA256SUMS were byte-matched. Both host manifests validated. The owner catalog now pins the alpha.3 plugin archive; an isolated installation matched all 15 files at the actual installed-registry path, with one skill and no agents/hooks/MCP payload. A prior intermittent Firefox login failure remains unexplained; passing this run is not a root-cause fix.
+
+The development entries below record work leading to alpha.3; their earlier “unreleased” wording is historical. The production gates in the table remain open. The owner-private website still advertises alpha.2 pending a separate deployment update.
 
 [0.1.0-alpha.2](https://github.com/Henrixbor/ai-disclosure/releases/tag/v0.1.0-alpha.2) is public, tied to source commit `e761ab7203c9b5994f00425fb6bfe785e23f54d1`. Its 46-test suite and all five GitHub jobs passed. Skill/plugin archives were validated, downloaded and hash-matched. Claude's catalog pins the alpha.2 archive SHA-256. Alpha.1 remains available unchanged.
 

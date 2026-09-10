@@ -10,6 +10,8 @@ AI Disclosure maintains one skill under `skills/ai-disclosure`. Archive layouts 
 
 Download versioned assets from [GitHub releases](https://github.com/Henrixbor/ai-disclosure/releases). Development versions are prereleases, not a production/legal-compliance guarantee. Compare downloaded files against `SHA256SUMS` from the same release, for example with `shasum -a 256 -c SHA256SUMS`. Checksums detect changed bytes; they are not a signature or an independent trust guarantee.
 
+Current prerelease: [0.1.0-alpha.3](https://github.com/Henrixbor/ai-disclosure/releases/tag/v0.1.0-alpha.3), with all three archives. The owner-maintained Claude catalog pins its plugin ZIP and SHA-256; this is not an official host catalog listing.
+
 ## Project installation
 
 The shortest supported route for both Codex and Claude Code remains:

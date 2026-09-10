@@ -104,6 +104,31 @@ On any unresolved finding, `html` is null and `assets` is empty. Hold that updat
 
 This tool is not an HTML sanitizer. Pass trusted template output with user content escaped/sanitized by the host application; it preserves existing HTML. It is a rendering integration point, not automatic support for every CMS, framework, iframe, native client or export. Verify the final route, scrolling, CSS/CSP, accessibility and application caching. The browser fixture exercises a recorded update and holds an unrecorded one; it does not stand in for production integration tests.
 
+## JavaScript publishing client
+
+Node projects can call the same engine without temporary HTML/manifest files. The optional CommonJS module has no npm dependencies; it needs Node 22+ and Python 3.9+ on the publishing worker. Keep it out of browser bundles and edge runtimes. Run it during generation, editorial publication or a build, then serve the saved result without starting Python for each visitor.
+
+```js
+const { renderFragment } = require('./.agents/skills/ai-disclosure/scripts/node.cjs');
+
+const result = await renderFragment({
+  root: '/absolute/path/to/public-assets',
+  html: trustedRenderedComponent,
+  manifest: savedEvidenceForThisVersion,
+  page: 'news/index.html',
+});
+if (result.html === null) {
+  // Retain the last published version; send result.report to a private review queue.
+  throw new Error('Disclosure review required before publishing this update');
+}
+// Store result.html and result.assets together in the existing publication transaction.
+// Load returned assets once in the enclosing page. Keep result.report private.
+```
+
+`inspectFragment({root, html, page})` returns the inventory used when recording evidence. `renderFragment({root, html, manifest, page})` returns HTML/assets/report. `exportDocument` accepts the same fields plus `title` and `language`, returning the portable document result described below. All return promises. Input is trusted application data, not a public request body; HTML is not sanitized. Do not automatically regenerate evidence when inspection detects a new revision.
+
+An unresolved assessment resolves with `html: null`; invalid input, missing Python, timeout or process failure rejects. Both outcomes must hold the update. Each call starts a local process with JSON over stdin and no shell. The optional second argument accepts `python` (one executable path, no arguments) and `timeoutMs` (1–300000, default 30000). `AI_DISCLOSURE_PYTHON` can set the executable instead. Requests are limited to 32 MiB and captured output to 64 MiB. Batch/cache in the host pipeline where appropriate; the client provides no job queue, database transaction or retry policy. This is an integration API, not a completed adapter for every framework.
+
 ## Portable document export
 
 `export-document` renders an assessed article/image component as a standalone HTML document with its own styles, visible notices and embedded PNG/JPEG/GIF/WebP images:

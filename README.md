@@ -66,3 +66,5 @@ See [the skill](skills/ai-disclosure/SKILL.md), [assessment input](skills/ai-dis
 The [distribution guide](docs/distribution.md) covers standalone skill and plugin archives, versioning and verification. Development releases are explicitly marked as prereleases.
 
 Unreleased main also includes portable article/image HTML export with embedded raster assets. Catalog installations remain on the versioned release shown in the distribution guide; consult the release audit for current development differences.
+
+JavaScript publishing workers on unreleased main can use the optional [Node client](skills/ai-disclosure/references/publishing.md#javascript-publishing-client) to inspect, render and export in memory. It calls the existing Python engine at publishing time, requires no npm dependencies, and holds unresolved updates. Framework-specific installation, transactions and caching still need integration.

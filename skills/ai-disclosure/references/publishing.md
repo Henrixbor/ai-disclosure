@@ -1,4 +1,21 @@
-# HTML publishing adapter
+# Publishing integrations
+
+## Choose the existing publication path
+
+Inspect the project before selecting an adapter. Reuse its existing content store, templates and deployment process.
+
+| Project path | Integration |
+| --- | --- |
+| Static HTML output | Use the bundled inventory, record, plan and build commands below. |
+| Node/server-rendered components | Use the bundled fragment client below inside the existing publication transaction. |
+| WordPress posts/pages | Read the [WordPress adapter guide](https://github.com/Henrixbor/ai-disclosure/blob/main/integrations/wordpress/README.md) and [migration guide](https://github.com/Henrixbor/ai-disclosure/blob/main/integrations/wordpress/MIGRATION.md). The PHP plugin and migration CLI are repository-only development integrations, not bundled in this skill. |
+| Other CMSs, native apps or external widgets | Implement the notice in the owning component and publishing path; retain unsupported surfaces in the report. |
+
+For WordPress, use an existing trusted repository checkout or obtain the public repository at an explicit revision. Keep the PHP plugin and migration client on the same policy version; do not combine an older catalog install with arbitrary newer runtime files. Follow the adapter's isolated-site verification before activating its publication gates. From that checkout, `python3 scripts/wordpress_migrate.py --discover --api-url https://example.com/wp-json` reads the authenticated inventory using credentials supplied privately as documented. It creates no origin facts. Establish evidence, plan the batch, then apply within the authorized migration scope. Connect future creation/editorial jobs to assessment recording before normal publication, and verify the actual templates, feeds and caches. A completed scan is not complete site coverage.
+
+These links describe development main and may be newer than an installed release. Check the selected revision's requirements and release status. Installing this skill does not install or activate a CMS plugin.
+
+## HTML publishing adapter
 
 This adapter renders local, static article and image disclosures. An experimental local audio/video player is also available, with the limitations below. A local HTML chat wrapper can carry interaction notices. Canvas and external frames still require dedicated integration; builds report these gaps rather than claim coverage. Use the customer's existing build output as input and deploy only the new output after browser verification.
 

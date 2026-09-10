@@ -23,8 +23,8 @@ module.exports = async function migrationChecks(docker, web, base) {
     echo wp_json_encode(['password' => $password[0], 'uuid' => $password[1]['uuid'], 'items' => $items]);`));
   const dir = await mkdtemp(join(tmpdir(), 'aid-migration-test-'));
   const batch = join(dir, 'batch.json');
-  async function run(apply) {
-    const args = [resolve(__dirname, 'wordpress_migrate.py'), batch, '--api-url', base + '/wp-json', '--allow-loopback-http'];
+  async function run(apply, scan = null) {
+    const args = [resolve(__dirname, 'wordpress_migrate.py'), ...(scan === null ? [batch] : ['--discover', ...scan]), '--api-url', base + '/wp-json', '--allow-loopback-http'];
     if (apply) args.push('--apply');
     return new Promise((accept, reject) => {
       execFile('python3', args, { timeout: 90000, maxBuffer: 1024 * 1024,
@@ -40,6 +40,22 @@ module.exports = async function migrationChecks(docker, web, base) {
   }
   try {
     await writeFile(batch, JSON.stringify({ version: 1, role: 'publisher', items: fixture.items }), { mode: 0o600 });
+    const firstScan = await run(false, ['--page-size', '2', '--max-pages', '1']);
+    assert.equal(firstScan.exit, 1);
+    assert.equal(firstScan.report.traversal_complete, false);
+    assert.ok(firstScan.report.records.length <= 2);
+    const restScan = await run(false, ['--after', String(firstScan.report.next_after), '--through-id', String(firstScan.report.through_id), '--page-size', '2', '--max-pages', '100']);
+    assert.equal(restScan.exit, 0);
+    assert.equal(restScan.report.traversal_complete, true);
+    assert.equal(restScan.report.through_id, firstScan.report.through_id);
+    const discovered = [...firstScan.report.records, ...restScan.report.records];
+    assert.equal(new Set(discovered.map(r => r.id)).size, discovered.length);
+    for (const item of fixture.items) {
+      const row = discovered.find(r => r.id === item.id);
+      assert.ok(row, 'Discovery must find each migration fixture');
+      assert.equal(row.decision, 'unassessed');
+      assert.ok(!('facts' in row) && !('title_excerpt' in row));
+    }
     const plan = await run(false);
     assert.equal(plan.exit, 1);
     assert.deepEqual(plan.report.results.map(r => r.status), ['ready_to_submit', 'revision_conflict', 'needs_review']);
@@ -53,7 +69,7 @@ module.exports = async function migrationChecks(docker, web, base) {
     const html = await (await fetch(new URL('/?p=' + fixture.items[0].id, base))).text();
     assert.ok(html.includes('data-ai-disclosure="wp-' + fixture.items[0].id + '"'));
     assert.ok(!html.includes('PRIVATE_BATCH_FIXTURE'));
-    console.log('WordPress migration CLI: real application-password auth; plan writes nothing; explicit apply labels legacy content; stale/unknown items held; retry reuses record; private report/output checks passed');
+    console.log('WordPress migration CLI: real application-password auth; bounded/resumed discovery and plan write nothing; explicit apply labels legacy content; stale/unknown items held; retry reuses record; private report/output checks passed');
   } finally {
     await rm(dir, { recursive: true, force: true });
     await php(`WP_Application_Passwords::delete_application_password(1, '${fixture.uuid}'); unlink(WPMU_PLUGIN_DIR . '/aid-migration-fixture.php');`);

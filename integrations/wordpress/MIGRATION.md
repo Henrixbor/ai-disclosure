@@ -4,6 +4,28 @@ The repository's Python client records evidence-backed assessments for existing 
 
 Use an isolated site copy first. Install the current development ZIP and configure its publishing/cache integrations. The client requires Python 3.9+ in the checkout and the current matching policy on the WordPress host. No Python is installed on WordPress.
 
+## Discover existing records
+
+Configure the application-password environment variables described below, then run:
+
+```sh
+python3 scripts/wordpress_migrate.py --discover \
+  --api-url https://example.com/wp-json
+```
+
+Discovery reads up to 10 pages of 100 records by default. Use `--page-size` (1–100) and `--max-pages` (1–100) to bound a run. It returns IDs, saved revisions, publication status, supported-text flags and assessment decisions. It omits title excerpts and evidence and never creates facts or assessments. Keep this report private because it can identify unpublished content.
+
+If `traversal_complete` is false and there is no error, continue with both returned cursor values:
+
+```sh
+python3 scripts/wordpress_migrate.py --discover \
+  --api-url https://example.com/wp-json --after 120 --through-id 980
+```
+
+Replace those illustrative numbers with `next_after` and `through_id` from your report. Preserve each report and combine its records with subsequent pages. On an error, resolve it before continuing from the last validated cursor. Exit 0 means the bounded traversal finished; exit 1 means it is incomplete or failed; exit 2 means invalid configuration or interruption.
+
+The initial upper ID stays fixed across pages, excluding later-created posts. This is not an immutable snapshot: edits, deletions and permission changes can occur during scanning. Only accessible post/page source records are covered; templates, media, embedded services and rendered surfaces need separate inspection. A completed traversal does not mean all site content has been assessed or is legally compliant.
+
 ## Prepare a private batch
 
 Use the authenticated inventory and assessment inspection endpoints to select items and obtain their exact revisions. Establish the origin/context facts from real creation and review records. Keep unknown facts unresolved. Save a UTF-8 JSON file with this shape, replacing the illustrative values with actual inspected data:

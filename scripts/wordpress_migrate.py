@@ -18,6 +18,7 @@ spec = importlib.util.spec_from_file_location('aid_migration_policy', ROOT / 'sk
 policy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(policy)
 LIMIT = 1024 * 1024
+MAX_ID = 9223372036854775807
 REVISION = re.compile(r'sha256:[a-f0-9]{64}\Z')
 RECORD = re.compile(r'[a-f0-9]{64}\Z')
 DECISIONS = {'disclose', 'exception_declared', 'no_publisher_label', 'outside_declared_scope'}
@@ -48,7 +49,7 @@ def read_batch(path):
     for item in data['items']:
         if not isinstance(item, dict) or set(item) != {'id', 'revision', 'facts'}:
             raise ValueError('Each item requires id, revision and facts only')
-        if type(item['id']) is not int or not 1 <= item['id'] <= 9223372036854775807 or item['id'] in seen:
+        if type(item['id']) is not int or not 1 <= item['id'] <= MAX_ID or item['id'] in seen:
             raise ValueError('Post IDs must be unique positive signed 64-bit integers')
         seen.add(item['id'])
         if not isinstance(item['revision'], str) or not REVISION.fullmatch(item['revision']):
@@ -89,8 +90,17 @@ class Client:
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirects())
 
     def request(self, method, post_id, body=None):
+        return self._request(method, '/ai-disclosure/v1/posts/' + str(post_id) + '/assessment', body)
+
+    def inventory(self, after, limit, through_id=None):
+        query = {'after': after, 'limit': limit}
+        if through_id is not None:
+            query['through_id'] = through_id
+        return self._request('GET', '/ai-disclosure/v1/inventory?' + urllib.parse.urlencode(query))
+
+    def _request(self, method, path, body=None):
         data = None if body is None else json.dumps(body, ensure_ascii=False).encode()
-        request = urllib.request.Request(self.base + '/ai-disclosure/v1/posts/' + str(post_id) + '/assessment',
+        request = urllib.request.Request(self.base + path,
             data=data, method=method, headers={'Authorization': self.auth, 'Content-Type': 'application/json', 'Accept': 'application/json'})
         try:
             with self.opener.open(request, timeout=30) as response:
@@ -103,6 +113,60 @@ class Client:
             status = error.code
             error.close()
             return status, None
+
+
+def discover(client, after=0, through_id=None, page_size=100, max_pages=10):
+    if (type(after) is not int or not 0 <= after <= MAX_ID
+        or type(page_size) is not int or not 1 <= page_size <= 100
+        or type(max_pages) is not int or not 1 <= max_pages <= 100
+        or (through_id is not None and (type(through_id) is not int or not after <= through_id <= MAX_ID))):
+        raise ValueError('Invalid inventory bounds')
+    report = {'mode': 'discover', 'policy': policy.POLICY, 'coverage': 'post-page-source-only',
+              'records': [], 'through_id': through_id, 'next_after': after, 'traversal_complete': False}
+    for _ in range(max_pages):
+        try:
+            status, page = client.inventory(after, page_size, through_id)
+            if status != 200:
+                report.update(error='inventory_failed', http_status=status)
+                break
+            if not isinstance(page, dict) or page.get('policy') != policy.POLICY:
+                report['error'] = 'policy_mismatch'
+                break
+            boundary = page.get('through_id')
+            next_after = page.get('next_after')
+            if (page.get('coverage') != 'post-page-source-only'
+                or type(boundary) is not int or not after <= boundary <= MAX_ID
+                or (through_id is not None and boundary != through_id)
+                or 'next_after' not in page
+                or (next_after is not None and (type(next_after) is not int or not after < next_after <= boundary))
+                or not isinstance(page.get('items'), list) or len(page['items']) > page_size):
+                raise ValueError('Invalid inventory page')
+            selected = []
+            previous = after
+            for item in page['items']:
+                if (not isinstance(item, dict) or type(item.get('id')) is not int
+                    or not previous < item['id'] <= (boundary if next_after is None else next_after)
+                    or item.get('type') not in {'post', 'page'}
+                    or not isinstance(item.get('revision'), str) or not REVISION.fullmatch(item['revision'])
+                    or type(item.get('supported_text')) is not bool
+                    or item.get('decision') not in DECISIONS | {'unassessed', 'withdrawn'}
+                    or not isinstance(item.get('status'), str) or not 1 <= len(item['status']) <= 64):
+                    raise ValueError('Invalid inventory item')
+                selected.append({key: item[key] for key in ['id', 'type', 'status', 'revision', 'supported_text', 'decision']})
+                previous = item['id']
+            # Validate the entire page before retaining any of it. Never forward
+            # title excerpts or additional private fields returned by a server.
+            report['records'].extend(selected)
+            through_id = boundary
+            report.update(through_id=boundary, next_after=next_after)
+            if next_after is None:
+                report['traversal_complete'] = True
+                break
+            after = next_after
+        except (OSError, ValueError, TypeError, KeyError, urllib.error.URLError):
+            report['error'] = 'invalid_or_unavailable_page'
+            break
+    return report
 
 
 def migrate(items, client, apply=False):
@@ -170,14 +234,28 @@ def migrate(items, client, apply=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('batch', type=Path)
+    parser.add_argument('batch', type=Path, nargs='?')
     parser.add_argument('--api-url', required=True)
+    parser.add_argument('--discover', action='store_true', help='Read bounded inventory pages without creating facts or assessments')
+    parser.add_argument('--after', type=int)
+    parser.add_argument('--through-id', type=int)
+    parser.add_argument('--page-size', type=int)
+    parser.add_argument('--max-pages', type=int)
     parser.add_argument('--apply', action='store_true', help='Record eligible assessments; does not publish or rewrite content')
     parser.add_argument('--allow-loopback-http', action='store_true', help='Disposable local test sites only')
     args = parser.parse_args()
     try:
-        items = read_batch(args.batch)
+        if args.discover and (args.batch is not None or args.apply):
+            raise ValueError('Discovery cannot apply a batch')
+        if not args.discover and (args.batch is None or any(value is not None for value in [args.after, args.through_id, args.page_size, args.max_pages])):
+            raise ValueError('Supply a batch or discovery options')
+        items = None if args.discover else read_batch(args.batch)
         client = Client(args.api_url, os.environ.get('AI_DISCLOSURE_WP_USER', ''), os.environ.get('AI_DISCLOSURE_WP_PASSWORD', ''), args.allow_loopback_http)
+        if args.discover:
+            report = discover(client, 0 if args.after is None else args.after, args.through_id,
+                              100 if args.page_size is None else args.page_size, 10 if args.max_pages is None else args.max_pages)
+            print(json.dumps(report, indent=2))
+            return 0 if report['traversal_complete'] else 1
         report = migrate(items, client, args.apply)
         print(json.dumps(report, indent=2))
         return 0 if report['complete'] else 1

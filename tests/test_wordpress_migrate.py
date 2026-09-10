@@ -28,6 +28,63 @@ class FakeClient:
 
 
 class MigrationTests(unittest.TestCase):
+    def inventory_client(self, pages):
+        class InventoryClient:
+            def __init__(self):
+                self.calls = []
+            def inventory(self, after, limit, through_id):
+                self.calls.append((after, limit, through_id))
+                return pages[len(self.calls) - 1]
+        return InventoryClient()
+
+    def inventory_page(self, items, next_after=None, boundary=7):
+        return 200, {'policy': migration.policy.POLICY, 'coverage': 'post-page-source-only',
+                     'items': items, 'next_after': next_after, 'through_id': boundary}
+
+    def inventory_item(self, post_id=7):
+        return {'id': post_id, 'type': 'post', 'status': 'draft', 'revision': REV,
+                'supported_text': True, 'decision': 'unassessed', 'title_excerpt': 'PRIVATE_TITLE'}
+
+    def test_discovery_follows_empty_permission_page_and_keeps_boundary(self):
+        client = self.inventory_client([self.inventory_page([], 3), self.inventory_page([self.inventory_item()])])
+        report = migration.discover(client, page_size=2)
+        self.assertTrue(report['traversal_complete'])
+        self.assertEqual(client.calls, [(0, 2, None), (3, 2, 7)])
+        self.assertEqual([r['id'] for r in report['records']], [7])
+        self.assertNotIn('PRIVATE_TITLE', json.dumps(report))
+        self.assertNotIn('facts', report['records'][0])
+
+    def test_discovery_budget_returns_a_resumable_cursor(self):
+        client = self.inventory_client([self.inventory_page([self.inventory_item(2)], 3)])
+        report = migration.discover(client, page_size=2, max_pages=1)
+        self.assertFalse(report['traversal_complete'])
+        self.assertEqual((report['next_after'], report['through_id']), (3, 7))
+        resumed = self.inventory_client([self.inventory_page([self.inventory_item()])])
+        self.assertTrue(migration.discover(resumed, after=3, through_id=7)['traversal_complete'])
+        self.assertEqual(resumed.calls[0], (3, 100, 7))
+
+    def test_discovery_rejects_unstable_boundaries_and_invalid_pages(self):
+        bad_pages = [self.inventory_page([], 0), self.inventory_page([], 8),
+                     self.inventory_page([self.inventory_item(), self.inventory_item()]),
+                     self.inventory_page([{**self.inventory_item(), 'revision': 'wrong'}])]
+        for page in bad_pages:
+            report = migration.discover(self.inventory_client([page]))
+            self.assertEqual(report['error'], 'invalid_or_unavailable_page')
+            self.assertEqual(report['records'], [])
+            self.assertEqual(report['next_after'], 0)
+        client = self.inventory_client([self.inventory_page([], 3), self.inventory_page([], boundary=8)])
+        report = migration.discover(client)
+        self.assertEqual(report['error'], 'invalid_or_unavailable_page')
+        self.assertEqual((report['next_after'], report['through_id']), (3, 7))
+
+    def test_discovery_retains_valid_pages_when_a_later_page_fails(self):
+        client = self.inventory_client([self.inventory_page([self.inventory_item(2)], 3), (503, None)])
+        report = migration.discover(client)
+        self.assertEqual(report['error'], 'inventory_failed')
+        self.assertEqual([r['id'] for r in report['records']], [2])
+        self.assertEqual(report['next_after'], 3)
+        self.assertFalse(report['traversal_complete'])
+
     def test_plan_reads_only_and_apply_binds_original_revision(self):
         client = FakeClient()
         result = migration.migrate([ITEM], client)

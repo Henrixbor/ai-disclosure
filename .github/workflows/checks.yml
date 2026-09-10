@@ -9,6 +9,18 @@ permissions:
   contents: read
 
 jobs:
+  php-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - run: python3 scripts/verify_php_policy.py --docker php:8.3-cli-alpine@sha256:afdf8b1fee58486ccc0dab5f30f634b86873d56dac985f71ba217945647c05ad
+
   python:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10

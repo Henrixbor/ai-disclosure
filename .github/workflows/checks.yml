@@ -55,6 +55,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run test:node
       - run: npx playwright install --with-deps chromium
+      - name: Verify live WordPress integration
+        run: npm run test:wordpress
       - name: Verify Next.js publishing integration
         run: |
           npm --prefix examples/nextjs ci --ignore-scripts --no-audit --no-fund

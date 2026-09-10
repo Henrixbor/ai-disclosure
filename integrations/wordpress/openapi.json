@@ -1,0 +1,281 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI Disclosure WordPress development API",
+    "version": "0.1.0-alpha.3",
+    "description": "Private assessment of proposed text; publish through WordPress core endpoints. Body limit 1 MiB. Identical retries are safe; conflicting facts return 409. Responses carry Cache-Control: private, no-store."
+  },
+  "servers": [
+    {
+      "url": "/wp-json"
+    }
+  ],
+  "security": [
+    {
+      "applicationPassword": []
+    },
+    {
+      "wpNonce": []
+    }
+  ],
+  "paths": {
+    "/ai-disclosure/v1/posts/{id}/assessment": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "get": {
+        "operationId": "inspectDisclosureVersion",
+        "responses": {
+          "200": {
+            "description": "Private assessment result, not legal certification.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "revision",
+                    "recorded",
+                    "supported_text",
+                    "policy"
+                  ],
+                  "properties": {
+                    "revision": {
+                      "type": "string"
+                    },
+                    "recorded": {
+                      "type": "boolean"
+                    },
+                    "supported_text": {
+                      "type": "boolean"
+                    },
+                    "policy": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "recordDisclosureAssessment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Assessment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Private assessment result, not legal certification.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "revision",
+                    "decision",
+                    "policy",
+                    "implementation_verified"
+                  ],
+                  "properties": {
+                    "revision": {
+                      "type": "string"
+                    },
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "outside_declared_scope",
+                        "no_publisher_label",
+                        "exception_declared",
+                        "disclose"
+                      ]
+                    },
+                    "policy": {
+                      "type": "string"
+                    },
+                    "implementation_verified": {
+                      "type": "boolean",
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "applicationPassword": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "WordPress username and application password over HTTPS."
+      },
+      "wpNonce": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-WP-Nonce",
+        "description": "Requires an existing authenticated WordPress cookie session as well."
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "WordPress error object; code is machine-readable.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "code",
+                "message",
+                "data"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Assessment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "facts"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "publisher",
+              "provider",
+              "both",
+              "unknown"
+            ],
+            "description": "Only an established publisher role passes. Omission remains unresolved."
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "facts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "origin"
+            ],
+            "properties": {
+              "origin": {
+                "type": "string",
+                "enum": [
+                  "human",
+                  "ai_generated",
+                  "ai_modified",
+                  "unknown"
+                ]
+              },
+              "evidence": {
+                "type": "string",
+                "minLength": 1
+              },
+              "applicable": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "public_interest": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "review": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "revision",
+                  "substantive_human_review",
+                  "responsible_entity"
+                ],
+                "properties": {
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "substantive_human_review": {
+                    "type": "boolean"
+                  },
+                  "responsible_entity": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

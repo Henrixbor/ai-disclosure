@@ -57,6 +57,8 @@ python3 -m unittest discover -s tests -v
 
 The public [Checks workflow](https://github.com/Henrixbor/ai-disclosure/actions/workflows/checks.yml) runs Python tests on Linux/macOS and browser checks on the generated demo. For local browser checks, follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
+To create a standalone skill archive, run `python3 scripts/package_skill.py --output release/ai-disclosure.zip`. It includes the instructions, references, scripts and licence, with reproducible contents and a printed SHA-256 digest. Extract the `ai-disclosure` folder into the relevant agent's skills directory. A packaged development build is not a production certification.
+
 Tests cover declared decisions, uncertainty, stale review, role gaps, invalid input, CLI exit codes and installation preservation. They do not test real model skill selection or a production site's visual/legal compliance.
 
 See [the skill](skills/ai-disclosure/SKILL.md), [assessment input](skills/ai-disclosure/references/manifest.md), and [research brief](research/product-feasibility.md).

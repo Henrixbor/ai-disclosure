@@ -6,3 +6,4 @@ release-site/
 .local-preview/
 node_modules/
 dist/
+release/

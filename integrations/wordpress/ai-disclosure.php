@@ -3,6 +3,7 @@
  * Plugin Name: AI Disclosure (Development)
  * Description: Version-bound text publication checks and notices. Development integration; not legal certification.
  * Version: 0.1.0-alpha.3
+ * Requires at least: 7.1
  * Requires PHP: 8.3
  * License: MIT
  */

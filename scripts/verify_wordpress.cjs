@@ -5,6 +5,7 @@ const { resolve } = require('node:path');
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const { randomBytes } = require('node:crypto');
+const wordpressPackage = require('./wordpress_package.cjs');
 
 async function editorChecks(browser, base, result, password) {
   const context = await browser.newContext();
@@ -104,12 +105,12 @@ async function editorChecks(browser, base, result, password) {
 }
 
 async function main() {
+  const archive = await wordpressPackage();
   const code = await readFile(resolve(__dirname, '../tests/wordpress-integration.php'), 'utf8');
   const password = randomBytes(24).toString('hex');
   const server = await runCLI({ command: 'server', wp: '7.1', php: '8.3', port: 0, workers: 1, quiet: true,
-    mount: [{ hostPath: resolve(__dirname, '../integrations/wordpress'), vfsPath: '/wordpress/wp-content/plugins/ai-disclosure' }],
     blueprint: { steps: [
-      { step: 'activatePlugin', pluginPath: '/wordpress/wp-content/plugins/ai-disclosure/ai-disclosure.php' },
+      { step: 'installPlugin', pluginData: { resource: 'literal', name: 'ai-disclosure-wordpress.zip', contents: archive.bytes }, options: { activate: true, onError: 'throw' } },
       { step: 'runPHP', code },
       { step: 'runPHP', code: "<?php require '/wordpress/wp-load.php'; wp_set_password('" + password + "', 1);" },
     ] },

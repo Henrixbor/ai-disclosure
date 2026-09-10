@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a reproducible standalone Agent Skill archive, excluding development files."""
+"""Build reproducible skill, agent-plugin or WordPress archives without development files."""
 import argparse
 import hashlib
 import io
@@ -11,6 +11,17 @@ SOURCE = ROOT / "skills/ai-disclosure"
 
 
 def package(source=SOURCE, kind="skill", repository=ROOT):
+    if kind == "wordpress":
+        source = repository / "integrations/wordpress"
+        required = {"ai-disclosure.php", "policy.php", "editor.php", "withdrawal.php",
+                    "inventory.php", "publication.php", "cache.php", "editor.js",
+                    "editor.css", "notice.css", "LICENSE", "readme.txt"}
+        if source.parent.is_symlink() or source.is_symlink() or any(p.is_symlink() for p in source.rglob("*")):
+            raise ValueError("WordPress packages must not contain symlinks")
+        for name in required:
+            if not (source / name).is_file():
+                raise ValueError("Missing required WordPress file: " + name)
+        return archive_files({"ai-disclosure/" + name: source / name for name in required})
     if kind not in {"skill", "plugin"}:
         raise ValueError("Unknown package format")
     required = {"SKILL.md", "LICENSE", "references/rules.md", "references/manifest.md",
@@ -31,6 +42,10 @@ def package(source=SOURCE, kind="skill", repository=ROOT):
             if not source_path.is_file() or source_path.is_symlink():
                 raise ValueError("Missing or symlinked plugin file: " + path)
             files["ai-disclosure/" + target] = source_path
+    return archive_files(files)
+
+
+def archive_files(files):
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for name in sorted(files):
@@ -48,12 +63,13 @@ def package(source=SOURCE, kind="skill", repository=ROOT):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--format", choices=["skill", "plugin"], default="skill")
+    parser.add_argument("--format", choices=["skill", "plugin", "wordpress"], default="skill")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     try:
-        if SOURCE.resolve() in args.output.resolve().parents:
-            raise ValueError("Do not write release archives into the skill source")
+        if any(source.resolve() in args.output.resolve().parents for source in
+               [SOURCE, ROOT / "integrations/wordpress"]):
+            raise ValueError("Do not write release archives into package source directories")
         if args.output.is_symlink():
             raise ValueError("Output must not be a symlink")
         payload = package(kind=args.format)

@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 import subprocess
@@ -15,6 +16,47 @@ packager = load("packager", ROOT / "scripts/package_skill.py")
 
 
 class PackagingTests(unittest.TestCase):
+    def test_wordpress_archive_is_reproducible_and_contains_runtime_only(self):
+        payload = packager.package(kind="wordpress")
+        self.assertEqual(payload, packager.package(kind="wordpress"))
+        source = ROOT / "integrations/wordpress"
+        runtime = {p.name for p in source.iterdir() if p.suffix in {".php", ".js", ".css"}}
+        expected = runtime | {"LICENSE", "readme.txt"}
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            self.assertEqual(set(archive.namelist()), {"ai-disclosure/" + name for name in expected})
+            for name in expected:
+                self.assertEqual(archive.read("ai-disclosure/" + name), (source / name).read_bytes())
+            for info in archive.infolist():
+                self.assertEqual(info.external_attr >> 16, 0o100644)
+                self.assertEqual(info.date_time, (2026, 1, 1, 0, 0, 0))
+        header = (source / "ai-disclosure.php").read_text()
+        readme = (source / "readme.txt").read_text()
+        self.assertEqual(re.search(r"Version: (.+)", header)[1], re.search(r"Stable tag: (.+)", readme)[1])
+        for field in ["Requires at least", "Requires PHP"]:
+            self.assertEqual(re.search(field + r": (.+)", header)[1], re.search(field + r": (.+)", readme)[1])
+
+    def test_wordpress_archive_omits_unlisted_files_and_rejects_missing_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = Path(tmp)
+            source = repository / "integrations/wordpress"
+            shutil.copytree(ROOT / "integrations/wordpress", source)
+            (source / "private-evidence.json").write_text("PRIVATE_PACKAGE_SENTINEL")
+            payload = packager.package(kind="wordpress", repository=repository)
+            self.assertEqual(payload, packager.package(kind="wordpress"))
+            (source / "cache.php").unlink()
+            with self.assertRaisesRegex(ValueError, "Missing required WordPress file: cache.php"):
+                packager.package(kind="wordpress", repository=repository)
+
+    def test_wordpress_archive_rejects_symlinked_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = Path(tmp)
+            source = repository / "integrations/wordpress"
+            shutil.copytree(ROOT / "integrations/wordpress", source)
+            (source / "policy.php").unlink()
+            (source / "policy.php").symlink_to(ROOT / "integrations/wordpress/policy.php")
+            with self.assertRaisesRegex(ValueError, "symlinks"):
+                packager.package(kind="wordpress", repository=repository)
+
     @unittest.skipUnless(shutil.which("node"), "Node is optional for Python-only installations")
     def test_extracted_node_client_uses_only_bundled_files(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,6 +1,8 @@
 <?php
 /**
  * Plugin Name: AI Disclosure (Development)
+ * Plugin URI: https://github.com/Henrixbor/ai-disclosure
+ * Update URI: https://github.com/Henrixbor/ai-disclosure
  * Description: Version-bound text publication checks and notices. Development integration; not legal certification.
  * Version: 0.1.0-alpha.3
  * Requires at least: 7.1

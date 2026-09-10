@@ -10,6 +10,47 @@ function aid_rest($method, $path, $body = null) {
     return rest_do_request($request);
 }
 wp_set_current_user(1);
+// Exercise WordPress's native update-header parsing and host dispatch with an
+// intercepted response. No remote update package is downloaded or installed.
+require_once ABSPATH . 'wp-admin/includes/plugin.php';
+$updatePlugin = 'ai-disclosure/ai-disclosure.php';
+$updateURI = 'https://github.com/Henrixbor/ai-disclosure';
+$controlPath = WP_PLUGIN_DIR . '/aid-update-control.php';
+file_put_contents($controlPath, "<?php\n/* Plugin Name: Fictional update control\nVersion: 1.0\n*/\n");
+wp_clean_plugins_cache(false);
+$priorUpdates = get_site_transient('update_plugins');
+$updateRequest = null;
+$updateDispatch = [];
+$interceptUpdate = static function ($pre, $args, $url) use (&$updateRequest) {
+    if (wp_parse_url($url, PHP_URL_HOST) !== 'api.wordpress.org' || !str_contains($url, '/plugins/update-check/')) {
+        return new WP_Error('aid_fixture_network', 'Unexpected network request in update fixture');
+    }
+    $updateRequest = json_decode($args['body']['plugins'], true);
+    return ['response' => ['code' => 200], 'headers' => [], 'body' => wp_json_encode([
+        'plugins' => ['aid-update-control.php' => ['slug' => 'aid-update-control', 'plugin' => 'aid-update-control.php', 'new_version' => '2.0', 'package' => 'https://example.invalid/never-download.zip']],
+        'translations' => [], 'no_update' => []]), 'cookies' => []];
+};
+$observeUpdate = static function ($update, $data, $file) use (&$updateDispatch) {
+    $updateDispatch[$file] = $data['UpdateURI'];
+    return $update;
+};
+add_filter('pre_http_request', $interceptUpdate, PHP_INT_MAX, 3);
+add_filter('update_plugins_github.com', $observeUpdate, 10, 3);
+try {
+    delete_site_transient('update_plugins');
+    wp_update_plugins();
+    $updates = get_site_transient('update_plugins');
+    aid_check(($updateRequest['plugins'][$updatePlugin]['UpdateURI'] ?? null) === $updateURI, 'Native update request carries the repository Update URI');
+    aid_check(($updateDispatch[$updatePlugin] ?? null) === $updateURI, 'Native updater dispatches to the declared repository hostname');
+    aid_check(!isset($updates->response[$updatePlugin]), 'No automatic repository update is invented without an updater');
+    aid_check(isset($updates->response['aid-update-control.php']), 'Other plugins retain their normal update responses');
+} finally {
+    remove_filter('pre_http_request', $interceptUpdate, PHP_INT_MAX);
+    remove_filter('update_plugins_github.com', $observeUpdate, 10);
+    unlink($controlPath);
+    wp_clean_plugins_cache(false);
+    if ($priorUpdates === false) delete_site_transient('update_plugins'); else set_site_transient('update_plugins', $priorUpdates);
+}
 $id = wp_insert_post(['post_title' => 'Fictional town news', 'post_content' => '<p>A fictional reading room opens.</p>', 'post_status' => 'draft'], true);
 aid_check(is_int($id) && $id > 0, 'Create draft');
 $route = '/ai-disclosure/v1/posts/' . $id . '/assessment';

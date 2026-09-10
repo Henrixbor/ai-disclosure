@@ -16,6 +16,8 @@ The command prints its SHA-256. It uses a fixed allowlist, deterministic timesta
 
 In a WordPress 7.1/PHP 8.3 test site, use **Plugins → Add New Plugin → Upload Plugin**, select the ZIP and activate **AI Disclosure (Development)**. You can alternatively copy this directory to `wp-content/plugins/ai-disclosure`. The entrypoint is `ai-disclosure.php`. No Python, shell execution, model SDK, npm dependency or remote disclosure service is needed on the WordPress host. Python and the repository's Playground dependency are used only to build and verify the archive locally. This packaging does not constitute a stable release or WordPress.org listing.
 
+The plugin declares this repository as its `Update URI`. WordPress documents this header as protection against accidentally replacing a third-party plugin with a similarly named WordPress.org plugin. It does not install a GitHub updater, verify archive signatures or prevent other privileged plugins from changing update responses. This development build is updated through the verified ZIP workflow; it does not automatically fetch new code or policy rules. See [WordPress's Update URI specification](https://make.wordpress.org/core/2021/06/29/introducing-update-uri-plugin-header-in-wordpress-5-8/).
+
 Use the editor panel below or WordPress's existing authenticated REST access: cookie authentication with `X-WP-Nonce` for same-site editor clients, or an application password over HTTPS for an external publishing integration. Never put credentials in public scripts or commit them. The caller must have both permission to edit the target post and the post type's publication capability.
 
 ### Replace an existing test installation

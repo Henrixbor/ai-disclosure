@@ -1,4 +1,4 @@
-const {chromium}=require('playwright');
+const { browserType, engine } = require('./browser_engine.cjs');
 const assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
 const {pathToFileURL}=require('node:url');
@@ -12,7 +12,7 @@ const path=require('node:path');
    if(attempt===29) throw Error('Media fixture server failed to start');
    await new Promise(resolve=>setTimeout(resolve,100));
   }
-  browser=await chromium.launch({headless:true});
+  browser=await browserType.launch({headless:true});
   const page=await browser.newPage(); const errors=[]; page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:4174');
   await page.waitForSelector('[data-aid-player][data-state="ready"]');
@@ -50,7 +50,7 @@ const path=require('node:path');
   await page.getByRole('button',{name:'Fullscreen',exact:true}).click();
   await page.waitForFunction(()=>document.fullscreenElement?.classList.contains('aid-media'));
   assert.equal(await page.locator('.aid-notice').isVisible(),true);
-  await page.screenshot({path:'.local-preview/video-fullscreen.png'});
+  await page.screenshot({path:`.local-preview/video-fullscreen-${engine}.png`});
   await page.getByRole('button',{name:'Exit fullscreen',exact:true}).click();
   for (const width of [390,1440]) {
    await nojs.setViewportSize({width,height:800});
@@ -98,6 +98,6 @@ const path=require('node:path');
   assert.deepEqual(network,[],'Portable document must load without external requests');
   await offline.close();
   assert.deepEqual(errors,[]);
-  console.log('PASS: offline document images and print notices; recorded dynamic publication and held stale update; audio/video captions and video fullscreen; chat first rendering, deep links, mobile and resumed template; real audio sequencing, pause, configuration invalidation, notice failure, no-JS visibility. Silence fixture does not validate spoken wording.');
+  console.log(engine + ' PASS: offline document images and print notices; recorded dynamic publication and held stale update; audio/video captions and video fullscreen; chat first rendering, deep links, mobile and resumed template; real audio sequencing, pause, configuration invalidation, notice failure, no-JS visibility. Silence fixture does not validate spoken wording.');
  } finally {if(browser) await browser.close(); server.kill();}
 })().catch(e=>{console.error(e);process.exit(1)});

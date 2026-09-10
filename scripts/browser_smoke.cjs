@@ -1,9 +1,9 @@
 /* Optional browser QA: NODE_PATH can point to a preinstalled Playwright runtime. */
 const assert = require('node:assert/strict');
-const { chromium } = require('playwright');
+const { browserType, engine } = require('./browser_engine.cjs');
 
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await browserType.launch({ headless: true });
   try {
     for (const width of [390, 1440]) {
       const context = await browser.newContext({ viewport: { width, height: 1000 }, javaScriptEnabled: false, reducedMotion: 'reduce' });
@@ -36,10 +36,10 @@ const { chromium } = require('playwright');
       assert.ok(layout.notices.find(n => n.id === 'website').top < 250, 'Page notice must be present at entry');
       await page.getByRole('link', { name: 'Start with the skill' }).click();
       assert.ok(await page.locator('#install').evaluate(e => Math.abs(e.getBoundingClientRect().top) < 100));
-      await page.screenshot({ path: `.local-preview/preview-${width}.png`, fullPage: true });
+      await page.screenshot({ path: `.local-preview/preview-${engine}-${width}.png`, fullPage: true });
       assert.deepEqual(errors, []);
       await context.close();
-      console.log(`PASS ${width}px: visible static notices, local CSS, no overflow, installation navigation, no page errors`);
+      console.log(`PASS ${engine} ${width}px: visible static notices, local CSS, no overflow, installation navigation, no page errors`);
     }
   } finally {
     await browser.close();

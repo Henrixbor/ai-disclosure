@@ -69,7 +69,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run test:node
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox webkit
       - name: Verify live WordPress integration
         run: npm run test:wordpress
       - name: Verify Next.js publishing integration
@@ -87,9 +87,13 @@ jobs:
             if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then break; fi
             sleep 1
           done
-          npm run test:browser
+          for engine in chromium firefox webkit; do
+            AI_DISCLOSURE_BROWSER="$engine" npm run test:browser
+          done
 
       - name: Verify experimental media playback
         run: |
           python3 scripts/build_media_fixture.py
-          node scripts/browser_media.cjs
+          for engine in chromium firefox webkit; do
+            AI_DISCLOSURE_BROWSER="$engine" node scripts/browser_media.cjs
+          done

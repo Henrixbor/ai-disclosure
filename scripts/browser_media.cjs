@@ -5,7 +5,7 @@ const {pathToFileURL}=require('node:url');
 const path=require('node:path');
 (async()=>{
  const server=spawn('python3',['-m','http.server','4174','--bind','127.0.0.1','--directory','.local-preview/media-output'],{stdio:'ignore'});
- let browser;
+ let browser, page;
  try {
   for(let attempt=0;attempt<30;attempt++){
    try {const response=await fetch('http://127.0.0.1:4174'); if(response.ok) break;} catch {}
@@ -13,7 +13,7 @@ const path=require('node:path');
    await new Promise(resolve=>setTimeout(resolve,100));
   }
   browser=await browserType.launch({headless:true});
-  const page=await browser.newPage(); const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  page=await browser.newPage(); const errors=[]; page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:4174');
   await page.waitForSelector('[data-aid-player][data-state="ready"]');
   assert.equal(await page.locator('[data-aid-content]').getAttribute('src'),null);
@@ -99,5 +99,19 @@ const path=require('node:path');
   await offline.close();
   assert.deepEqual(errors,[]);
   console.log(engine + ' PASS: offline document images and print notices; recorded dynamic publication and held stale update; audio/video captions and video fullscreen; chat first rendering, deep links, mobile and resumed template; real audio sequencing, pause, configuration invalidation, notice failure, no-JS visibility. Silence fixture does not validate spoken wording.');
+ } catch (error) {
+  if (page && !page.isClosed()) {
+   console.error(engine + ' media failure state:', JSON.stringify(await page.evaluate(() => ({
+    state: document.querySelector('[data-aid-player]')?.dataset.state,
+    status: document.querySelector('[data-aid-status]')?.textContent,
+    media: [...document.querySelectorAll('audio,video')].map(element => ({
+     tag: element.tagName, source: element.getAttribute('src'), paused: element.paused,
+     currentTime: element.currentTime, duration: element.duration, ended: element.ended,
+     readyState: element.readyState, networkState: element.networkState,
+     error: element.error && { code: element.error.code, message: element.error.message }
+    }))
+   })).catch(() => 'Page diagnostics unavailable')));
+  }
+  throw error;
  } finally {if(browser) await browser.close(); server.kill();}
 })().catch(e=>{console.error(e);process.exit(1)});

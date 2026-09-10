@@ -93,6 +93,13 @@ jobs:
 
       - name: Verify experimental media playback
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils
+          pulseaudio --start --exit-idle-time=-1
+          trap 'pulseaudio --kill' EXIT
+          pactl load-module module-null-sink sink_name=aid_ci
+          pactl set-default-sink aid_ci
+          pactl list short sinks
           python3 scripts/build_media_fixture.py
           for engine in chromium firefox webkit; do
             AI_DISCLOSURE_BROWSER="$engine" node scripts/browser_media.cjs

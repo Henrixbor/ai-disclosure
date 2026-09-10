@@ -10,9 +10,18 @@ async function editorChecks(browser, base, result, password) {
   const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultTimeout(10000);
-  // WordPress preferences hydrate asynchronously and can reopen this guide.
-  await page.addLocatorHandler(page.getByRole('dialog').filter({ hasText: 'Welcome to the editor' }),
-    async dialog => { await dialog.getByRole('button', { name: 'Close', exact: true }).click(); });
+  // Preferences hydrate asynchronously: the welcome guide may reopen and
+  // the Meta Boxes area may collapse. Use native controls before each action.
+  async function ensureEditor() {
+    const guide = page.getByRole('dialog').filter({ hasText: 'Welcome to the editor' });
+    if (await guide.isVisible()) {
+      await guide.getByRole('button', { name: 'Close', exact: true }).click();
+      await guide.waitFor({ state: 'hidden' });
+    }
+    const toggle = page.getByRole('button', { name: 'Meta Boxes', exact: true });
+    if (await toggle.count() && await toggle.getAttribute('aria-expanded') === 'false') await toggle.press('Enter');
+  }
+  await page.addLocatorHandler(page.locator('body'), ensureEditor, { noWaitAfter: true });
   try {
     await page.goto(new URL('/wp-login.php', base).href);
     await page.locator('#user_login').fill('admin');
@@ -25,16 +34,14 @@ async function editorChecks(browser, base, result, password) {
         if (await textMode.count()) await textMode.click();
       }
       const panel = page.locator('.aid-editor');
-      if (mode === 'block' && !await panel.isVisible()) {
-        const toggle = page.getByRole('button', { name: 'Meta Boxes', exact: true });
-        await toggle.focus();
-        await toggle.press('Enter');
-      }
-      await panel.waitFor({ timeout: 10000 });
       await panel.locator('[data-aid-load]').click();
       await page.waitForFunction(() => document.querySelector('[data-aid-fields]')?.disabled === false);
       if (mode === 'classic') await page.locator('#title').fill('Changed classic editor fixture');
-      else await page.evaluate(() => wp.data.dispatch('core/editor').editPost({ title: 'Changed block editor fixture' }));
+      else {
+        await page.evaluate(() => wp.data.dispatch('core/editor').editPost({ title: 'Changed block editor fixture' }));
+        // Reproduce the native collapse observed after preference hydration.
+        await page.getByRole('button', { name: 'Meta Boxes', exact: true }).press('Enter');
+      }
       await panel.locator('[data-aid-save]').click();
       await page.waitForFunction(() => document.querySelector('[data-aid-status]').textContent.includes('text changed since loading'));
       await panel.locator('[data-aid-load]').click();

@@ -103,3 +103,19 @@ A successful render returns `html`, `assets` and a private `report`. `assets` ma
 On any unresolved finding, `html` is null and `assets` is empty. Hold that update and retain the previous published version; never treat null as an instruction to delete existing content or publish the original unlabelled component. Initial server rendering and client navigation must use the same rendered component, including the notice. Do not expose the private report or CMS origin evidence in a public JSON response.
 
 This tool is not an HTML sanitizer. Pass trusted template output with user content escaped/sanitized by the host application; it preserves existing HTML. It is a rendering integration point, not automatic support for every CMS, framework, iframe, native client or export. Verify the final route, scrolling, CSS/CSP, accessibility and application caching. The browser fixture exercises a recorded update and holds an unrecorded one; it does not stand in for production integration tests.
+
+## Portable document export
+
+`export-document` renders an assessed article/image component as a standalone HTML document with its own styles, visible notices and embedded PNG/JPEG/GIF/WebP images:
+
+```sh
+python3 <skill-directory>/scripts/site.py export-document --root public-assets --html component.html --manifest export-facts.json --title "Publication title" --language en
+```
+
+Like fragment rendering, this returns JSON. Save only its `html` field as the downloadable `.html` document; keep its `report` private. `html: null` means no export may be published. The function `export_document` exposes the same operation for a publishing integration. An export SHA-256 identifies the exact generated HTML. The operation does not overwrite files or mutate records.
+
+Assess the export's own publication context. A conversation transcript must be recorded as publication text; the interaction notice from a live chatbot is not a substitute. Existing review exceptions require current evidence and version matching. Do not carry a scope decision into a materially different publication without reassessing it.
+
+The export accepts an explicit semantic subset of publication HTML. It rejects active/unsupported elements, hidden content, inline styles, relative navigation links, responsive image alternatives and images over 20 MiB. It removes source classes and behavioral attributes, retaining the supported document structure, text, hyperlinks and image alt text. The host's CSS and scripts are not included. Root-relative asset paths resolve against the supplied asset directory, then image bytes are embedded and checked against the assessed hash. HTTP(S)/mailto links and document anchors remain usable; the document makes no automatic external requests.
+
+Notices remain available offline and in print styling. Images are embedded byte-for-byte, preserving their original metadata. This does not add machine-readable provider marking, authenticate existing provenance, burn labels into raster pixels, or make a separately extracted raw image carry the document's label. Distribute the document as a unit. Raw media downloads, audio/video exports, PDF/Word generation and native/social sharing still need dedicated integrations and verification. Language identifies the document language; default notices are currently English and localized wording still requires an implementation decision.

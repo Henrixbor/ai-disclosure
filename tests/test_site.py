@@ -1,4 +1,6 @@
 import json
+import base64
+import re
 import subprocess
 from pathlib import Path
 import sys
@@ -218,6 +220,60 @@ class PublishingTests(unittest.TestCase):
         result = publisher.render_fragment(self.root, changed, fresh)
         self.assertEqual(result["report"]["results"][0]["status"], "disclose")
         self.assertIn('class="aid-notice"', result["html"])
+
+    def test_document_export_embeds_unchanged_image_and_local_notices(self):
+        image = IMAGE.replace('park.svg', 'green.png')
+        original = (ROOT / "tests/fixtures/green.png").read_bytes()
+        (self.root / "green.png").write_bytes(original)
+        facts = self.fragment_facts(image, "image", deepfake=True)
+        result = publisher.export_document(self.root, image, facts, "Example export", "en")
+        self.assertIn('<title>Example export</title>', result["html"])
+        self.assertIn('class="aid-notice"', result["html"])
+        encoded = re.search(r'src="data:image/png;base64,([^"]+)"', result["html"]).group(1)
+        self.assertEqual(base64.b64decode(encoded), original)
+        self.assertEqual((self.root / "green.png").read_bytes(), original)
+        self.assertNotIn('<script', result["html"])
+        self.assertNotIn('<link', result["html"])
+        self.assertNotIn('CMS generation transaction', result["html"])
+
+    def test_image_changed_during_export_is_rejected(self):
+        image = IMAGE.replace('park.svg', 'green.png')
+        target = self.root / "green.png"
+        target.write_bytes((ROOT / "tests/fixtures/green.png").read_bytes())
+        facts = self.fragment_facts(image, "image", deepfake=True)
+        render = publisher.render_document
+        def changed_render(*args):
+            target.write_bytes(target.read_bytes() + b"changed")
+            return render(*args)
+        with patch.object(publisher, "render_document", side_effect=changed_render):
+            with self.assertRaisesRegex(ValueError, "changed during export"):
+                publisher.export_document(self.root, image, facts, "Title", "en")
+
+    def test_document_export_holds_stale_facts(self):
+        facts = self.fragment_facts(ARTICLE)
+        result = publisher.export_document(self.root, ARTICLE.replace("A new park.", "Changed."), facts, "Title", "en")
+        self.assertIsNone(result["html"])
+
+    def test_document_export_rejects_active_hidden_and_unsupported_content(self):
+        for addition in ('<script>alert(1)</script>', '<iframe src="https://example.com"></iframe>',
+                         '<p hidden>Hidden text</p>', '<p style="display:none">Hidden text</p>'):
+            source = ARTICLE.replace('</article>', addition+'</article>')
+            facts = self.fragment_facts(source)
+            try:
+                result = publisher.export_document(self.root, source, facts, "Title", "en")
+                self.assertIsNone(result["html"])
+            except ValueError:
+                pass
+        source = ARTICLE.replace('<p>', '<p onclick="alert(1)">')
+        result = publisher.export_document(self.root, source, self.fragment_facts(source), "<Title>", "en")
+        self.assertNotIn('onclick', result["html"])
+        self.assertIn('&lt;Title&gt;', result["html"])
+
+    def test_document_export_does_not_reuse_interaction_notice_for_transcript(self):
+        source = '<section class="aid-chat" data-ai-content="chat"><!-- ai-disclosure --><p>Conversation</p></section>'
+        facts = self.fragment_facts(source, "chatbot", direct_ai_interaction=True)
+        with self.assertRaises(ValueError):
+            publisher.export_document(self.root, source, facts, "Transcript", "en")
 
     def test_fragment_cli_success_and_stale_exit_codes(self):
         source = self.base / "component.html"

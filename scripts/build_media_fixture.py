@@ -60,3 +60,13 @@ output=pathlib.Path('.local-preview/media-output')
     document.querySelector('[role=status]').textContent='Published recorded update.';
   });
 });''')
+
+shutil.copyfile('tests/fixtures/green.png',root/'green.png')
+export_source='<article data-ai-content="export-story"><h1>Portable publication</h1><!-- ai-disclosure --><p>This test document carries its disclosures.</p><figure class="aid-media" data-ai-content="export-image"><!-- ai-disclosure --><img src="green.png" alt="Solid green test image"></figure></article>'
+export_items=[]
+for row in p.fragment_inventory(root,export_source)[1]['records']:
+    export_items.append({'id':row['id'],'revision':row['revision'],'kind':'image' if row['tag']=='figure' else 'text',
+        'origin':'ai_generated','applicable':True,'public_interest':True,'deepfake':True,
+        'evidence':'Export mechanics fixture'})
+exported=p.export_document(root,export_source,{'version':1,'role':'publisher','items':export_items},'Portable publication','en')
+(output/'export.html').write_text(exported['html'])

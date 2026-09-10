@@ -14,6 +14,7 @@ import tempfile
 from urllib.parse import unquote, urlsplit
 
 from assess import assess
+from exports import render_document
 
 VOID = set("area base br col embed hr img input link meta param source track wbr".split())
 CANDIDATES = {"article", "img", "video", "audio", "iframe", "canvas"}
@@ -386,6 +387,28 @@ def render_fragment(root, source, declared, page="index.html"):
     return {"html": output, "assets": assets, "report": report}
 
 
+def export_document(root, source, declared, title, language, page="index.html"):
+    """Export supported publication content with its own styles and embedded images."""
+    root = root.resolve()
+    result = render_fragment(root, source, declared, page)
+    if result["html"] is None:
+        return {"html": None, "report": result["report"]}
+    if any(item["kind"] not in {"text", "image"} for item in declared["items"]):
+        raise ValueError("Document export supports text and images; transcripts require a separate publication assessment")
+    expected = {asset["url"]: asset["sha256"] for record in result["report"]["inventory"]["records"] for asset in record["assets"]}
+    def load_asset(url):
+        path = local_asset(root, page, url)
+        if path.stat().st_size > 20 * 1024 * 1024:
+            raise ValueError("Export image exceeds 20 MiB")
+        payload = path.read_bytes()
+        if hashlib.sha256(payload).hexdigest() != expected.get(url):
+            raise ValueError("Image changed during export; retry with current evidence")
+        return payload
+    document = render_document(result["html"], load_asset, title, language)
+    return {"html": document, "report": result["report"],
+            "export_sha256": hashlib.sha256(document.encode("utf-8")).hexdigest()}
+
+
 def build(root, manifest, output):
     root, output = root.resolve(), output.absolute()
     if output.exists() or output.is_symlink():
@@ -468,17 +491,19 @@ def nonempty_fact(value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("inventory", "record", "plan", "build", "inspect-fragment", "render-fragment"))
+    parser.add_argument("command", choices=("inventory", "record", "plan", "build", "inspect-fragment", "render-fragment", "export-document"))
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--facts", type=Path)
     parser.add_argument("--html", type=Path)
     parser.add_argument("--page", default="index.html")
+    parser.add_argument("--title")
+    parser.add_argument("--language")
     parser.add_argument("--role", choices=("publisher", "provider", "both", "unknown"))
     args = parser.parse_args()
     try:
-        if args.command in {"inspect-fragment", "render-fragment"}:
+        if args.command in {"inspect-fragment", "render-fragment", "export-document"}:
             if args.html is None:
                 raise ValueError("Fragment commands need --html")
             source = args.html.read_text(encoding="utf-8")
@@ -490,7 +515,9 @@ def main():
                     raise ValueError("render-fragment needs --manifest")
                 if args.root.resolve() in args.manifest.resolve().parents:
                     raise ValueError("Keep private facts outside the public asset root")
-                result = render_fragment(args.root, source, json.loads(args.manifest.read_text(encoding="utf-8")), args.page)
+                declared = json.loads(args.manifest.read_text(encoding="utf-8"))
+                result = (export_document(args.root, source, declared, args.title, args.language, args.page)
+                          if args.command == "export-document" else render_fragment(args.root, source, declared, args.page))
                 code = int(result["html"] is None)
         elif args.command == "inventory":
             result = inventory(args.root)[1]

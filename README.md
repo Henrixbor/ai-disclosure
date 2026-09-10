@@ -64,3 +64,5 @@ Tests cover declared decisions, uncertainty, stale review, role gaps, invalid in
 See [the skill](skills/ai-disclosure/SKILL.md), [assessment input](skills/ai-disclosure/references/manifest.md), and [research brief](research/product-feasibility.md).
 
 The [distribution guide](docs/distribution.md) covers standalone skill and plugin archives, versioning and verification. Development releases are explicitly marked as prereleases.
+
+Unreleased main also includes portable article/image HTML export with embedded raster assets. Catalog installations remain on the versioned release shown in the distribution guide; consult the release audit for current development differences.

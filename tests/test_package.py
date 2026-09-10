@@ -19,7 +19,7 @@ class PackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with zipfile.ZipFile(io.BytesIO(first)) as archive:
-                self.assertEqual(len(archive.namelist()), 8)
+                self.assertEqual(len(archive.namelist()), 9)
                 self.assertTrue(all(name.startswith("ai-disclosure/") and ".." not in name.split("/") for name in archive.namelist()))
                 archive.extractall(root)
             skill = root / "ai-disclosure"
@@ -41,7 +41,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(payload, packager.package(kind="plugin"))
         with tempfile.TemporaryDirectory() as tmp:
             with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-                self.assertEqual(len(archive.namelist()), 12)
+                self.assertEqual(len(archive.namelist()), 13)
                 archive.extractall(tmp)
             root = Path(tmp) / "ai-disclosure"
             codex = json.loads((root / ".codex-plugin/plugin.json").read_text())

@@ -24,6 +24,9 @@ $subscriber = wp_create_user('subscriber-fixture', wp_generate_password(), 'subs
 wp_set_current_user($subscriber);
 aid_check(aid_rest('POST', $route, $declaration)->get_status() === 403, 'Insufficient capabilities denied');
 wp_set_current_user(1);
+$inspection = aid_rest('POST', '/ai-disclosure/v1/posts/' . $id . '/inspection', ['content' => '<p>Proposed, not saved.</p>']);
+aid_check($inspection->get_status() === 200 && $inspection->get_data()['assessment'] === null, 'Proposed text can be inspected without recording facts');
+aid_check(get_post($id)->post_content === '<p>A fictional reading room opens.</p>', 'Inspection does not mutate content');
 aid_check(aid_rest('POST', '/wp/v2/posts/' . $id, ['status' => 'publish'])->get_status() === 409, 'REST blocks missing facts');
 aid_check(is_wp_error(wp_update_post(['ID' => $id, 'post_status' => 'publish'], true)), 'Native update blocks missing facts');
 aid_check(aid_rest('POST', $route, ['facts' => $facts])->get_status() === 422, 'Role cannot be assumed');
@@ -134,5 +137,10 @@ aid_check(!\AiDisclosure\WordPress\replace_record($casKey, $previous, ['token' =
 aid_check(get_option($casKey) === ['token' => 'ORIGINAL'], 'Object cache reflects the committed winner');
 delete_option($casKey);
 
-file_put_contents('/wordpress/aid-test-result.json', wp_json_encode(['id' => $id, 'history_route' => $historyRoute, 'checks' => 'passed']));
+$uiClassic = wp_insert_post(['post_title' => 'Classic editor fixture', 'post_content' => 'Fictional editor test text.', 'post_status' => 'draft'], true);
+$uiBlock = wp_insert_post(['post_title' => 'Block editor fixture', 'post_content' => '<!-- wp:paragraph --><p>Fictional block editor text.</p><!-- /wp:paragraph -->', 'post_status' => 'draft'], true);
+update_post_meta($uiClassic, 'aid_classic_fixture', true);
+wp_mkdir_p('/wordpress/wp-content/mu-plugins');
+file_put_contents('/wordpress/wp-content/mu-plugins/aid-editor-fixture.php', '<?php add_filter("use_block_editor_for_post", static function($use, $post) { return get_post_meta($post->ID, "aid_classic_fixture", true) ? false : $use; }, 10, 2);');
+file_put_contents('/wordpress/aid-test-result.json', wp_json_encode(['id' => $id, 'classic_id' => $uiClassic, 'block_id' => $uiBlock, 'history_route' => $historyRoute, 'checks' => 'passed']));
 echo "WordPress publishing, amendment, database conflict and evidence checks passed\n";

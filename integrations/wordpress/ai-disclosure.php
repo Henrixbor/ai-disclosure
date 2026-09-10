@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace AiDisclosure\WordPress;
 if (!defined('ABSPATH')) exit;
 require_once __DIR__ . '/policy.php';
+require_once __DIR__ . '/editor.php';
 
 function supported($post): bool { return $post && in_array($post->post_type, ['post', 'page'], true); }
 function snapshot($post): array {
@@ -151,6 +152,26 @@ function assessment_route($request) {
 }
 
 add_action('rest_api_init', static function () {
+    register_rest_route('ai-disclosure/v1', '/posts/(?P<id>\d+)/inspection', [
+        'methods' => 'POST', 'permission_callback' => __NAMESPACE__ . '\\permitted',
+        'callback' => static function ($request) {
+            if (!permitted($request)) return new \WP_Error('ai_disclosure_forbidden', 'Permission denied.', ['status' => 403]);
+            if (strlen($request->get_body()) > 1048576) return new \WP_Error('ai_disclosure_size', 'Inspection request exceeds 1 MiB.', ['status' => 413]);
+            $body = json_decode($request->get_body());
+            if (!($body instanceof \stdClass) || array_diff(array_keys(get_object_vars($body)), ['title', 'content', 'excerpt'])) {
+                return new \WP_Error('ai_disclosure_input', 'Expected proposed title, content and excerpt fields only.', ['status' => 400]);
+            }
+            $post = get_post((int) $request['id']);
+            $source = snapshot($post);
+            foreach ($body as $key => $value) {
+                if (!is_string($value)) return new \WP_Error('ai_disclosure_input', 'Text fields must be strings.', ['status' => 400]);
+                $source[$key] = $value;
+            }
+            $record = record_for($post->ID, $source);
+            return ['revision' => revision($source), 'supported_text' => supported_text($source),
+                'assessment' => $record ? private_record($record) : null, 'policy' => \AiDisclosure\POLICY];
+        },
+    ]);
     register_rest_route('ai-disclosure/v1', '/posts/(?P<id>\d+)/assessment', [
         'methods' => ['GET', 'POST'], 'callback' => __NAMESPACE__ . '\\assessment_route',
         'permission_callback' => __NAMESPACE__ . '\\permitted',

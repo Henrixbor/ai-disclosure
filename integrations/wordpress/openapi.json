@@ -207,6 +207,95 @@
           }
         }
       }
+    },
+    "/ai-disclosure/v1/posts/{id}/inspection": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "post": {
+        "operationId": "inspectProposedEditorText",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "excerpt": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inspect proposed editor text without saving content or assessment facts. May return private facts for an already recorded version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "revision",
+                    "supported_text",
+                    "policy",
+                    "assessment"
+                  ],
+                  "properties": {
+                    "revision": {
+                      "type": "string"
+                    },
+                    "supported_text": {
+                      "type": "boolean"
+                    },
+                    "policy": {
+                      "type": "string"
+                    },
+                    "assessment": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/PrivateRecord"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {

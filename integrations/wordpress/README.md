@@ -42,6 +42,8 @@ When recording facts, send that inspection's revision as `expected_revision` on 
 
 ## Inventory existing content
 
+Once real evidence and inspected revisions are available, use the [batch migration client](MIGRATION.md) to plan and apply assessments. Planning is read-only by default; apply preserves unresolved items and uses content-version preconditions.
+
 Agents can read `GET /wp-json/ai-disclosure/v1/inventory?limit=25`. The endpoint requires publication capability, then checks edit and publication permissions on every item. It scans posts and pages in all statuses, including unpublished, auto-draft and trash records. It returns ID, type, status, a short title excerpt, exact text revision, `supported_text` and `decision`. It returns no evidence or article body and makes no changes.
 
 Continue with `after=<next_after>&through_id=<through_id>&limit=25`, keeping the first response's `through_id`. Stop only when `next_after` is null: an empty authorized page can still have more candidates. The default limit is 25, maximum 100. The limit bounds scanned database IDs, so fewer items may be returned after permission filtering. IDs created above the initial boundary belong to a later scan. Numeric cursors are traversal positions, not credentials or proof that omitted content does not exist.

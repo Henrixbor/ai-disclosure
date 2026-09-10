@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -178,6 +179,71 @@ class PublishingTests(unittest.TestCase):
             with self.subTest(url=url):
                 self.write(IMAGE.replace('park.svg', url))
                 self.assertTrue(publisher.inventory(self.root)[1]["gaps"])
+
+    def fragment_facts(self, source, kind="text", **facts):
+        records = publisher.fragment_inventory(self.root, source)[1]["records"]
+        return {"version": 1, "role": "publisher", "items": [
+            {"id": r["id"], "revision": r["revision"], "kind": kind, "origin": "ai_generated",
+             "applicable": True, "public_interest": True, "evidence": "CMS generation transaction", **facts}
+            for r in records]}
+
+    def test_fragment_render_is_pure_and_preserves_declared_input(self):
+        facts = self.fragment_facts(ARTICLE)
+        before = json.dumps(facts, sort_keys=True)
+        files = sorted(str(p) for p in self.root.rglob("*"))
+        rendered = publisher.render_fragment(self.root, ARTICLE, facts)
+        self.assertIn('class="aid-notice"', rendered["html"])
+        self.assertNotIn('<head>', rendered["html"])
+        self.assertNotIn('CMS generation transaction', rendered["html"])
+        self.assertEqual(json.dumps(facts, sort_keys=True), before)
+        self.assertEqual(sorted(str(p) for p in self.root.rglob("*")), files)
+        self.assertEqual(rendered["assets"]["ai-disclosure.css"], publisher.STYLE)
+
+    def test_stale_fragment_or_missing_facts_returns_no_publishable_html(self):
+        facts = self.fragment_facts(ARTICLE)
+        changed = ARTICLE.replace("A new park.", "New claim.")
+        result = publisher.render_fragment(self.root, changed, facts)
+        self.assertIsNone(result["html"])
+        self.assertFalse(result["assets"])
+        facts["items"][0]["origin"] = "unknown"
+        self.assertIsNone(publisher.render_fragment(self.root, ARTICLE, facts)["html"])
+
+    def test_refreshed_fragment_requires_new_review_for_exemption(self):
+        facts = self.fragment_facts(ARTICLE)
+        facts["items"][0]["review"] = {"revision": facts["items"][0]["revision"],
+            "substantive_human_review": True, "responsible_entity": "Editor"}
+        changed = ARTICLE.replace("A new park.", "New claim.")
+        fresh = self.fragment_facts(changed)
+        fresh["items"][0]["review"] = facts["items"][0]["review"]
+        result = publisher.render_fragment(self.root, changed, fresh)
+        self.assertEqual(result["report"]["results"][0]["status"], "disclose")
+        self.assertIn('class="aid-notice"', result["html"])
+
+    def test_fragment_cli_success_and_stale_exit_codes(self):
+        source = self.base / "component.html"
+        source.write_text(ARTICLE)
+        self.manifest.write_text(json.dumps(self.fragment_facts(ARTICLE)))
+        command = [sys.executable, str(ROOT / "skills/ai-disclosure/scripts/site.py"),
+                   "render-fragment", "--root", str(self.root), "--html", str(source),
+                   "--manifest", str(self.manifest)]
+        good = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(good.returncode, 0, good.stderr)
+        self.assertIn('class="aid-notice"', json.loads(good.stdout)["html"])
+        source.write_text(ARTICLE.replace("A new park.", "Changed claim."))
+        stale = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(stale.returncode, 1, stale.stderr)
+        self.assertIsNone(json.loads(stale.stdout)["html"])
+
+    def test_fragment_asset_change_and_invalid_boundaries(self):
+        facts = self.fragment_facts(IMAGE, "image", deepfake=True)
+        (self.root / "park.svg").write_text("Changed asset")
+        self.assertIsNone(publisher.render_fragment(self.root, IMAGE, facts)["html"])
+        for source in (ARTICLE + ARTICLE, "unbound" + ARTICLE, '<div>Unbound</div>'):
+            with self.assertRaises(ValueError):
+                publisher.fragment_inventory(self.root, source)
+        for page in ('../private.html', '/index.html', 'https://example.com/index.html'):
+            with self.assertRaises(ValueError):
+                publisher.fragment_inventory(self.root, ARTICLE, page)
 
     def test_chat_notice_precedes_conversation_without_javascript(self):
         self.write('<section class="aid-chat" data-ai-content="chat"><h2>Support</h2><!-- ai-disclosure -->'

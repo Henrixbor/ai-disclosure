@@ -194,20 +194,22 @@ def player_markup(item, region, descendants, root, relative):
     return media.start, media.end, markup
 
 
-def inventory(root):
-    root = root.resolve()
-    if not root.is_dir():
-        raise ValueError("Input root must be an existing public HTML build directory")
-    documents, records, gaps, ignored, assets = {}, [], [], [], {}
+def source_documents(root):
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
             raise ValueError("Symlinks are not supported in the public input: " + str(path))
         if any(part.startswith(".") for part in path.relative_to(root).parts):
             continue
-        if not path.is_file() or path.suffix.lower() != ".html":
-            continue
-        relative = path.relative_to(root).as_posix()
-        source = path.read_text(encoding="utf-8")
+        if path.is_file() and path.suffix.lower() == ".html":
+            yield path.relative_to(root).as_posix(), path.read_text(encoding="utf-8")
+
+
+def inventory(root, sources=None):
+    root = root.resolve()
+    if not root.is_dir():
+        raise ValueError("Input root must be an existing public asset directory")
+    documents, records, gaps, ignored, assets = {}, [], [], [], {}
+    for relative, source in source_documents(root) if sources is None else sources:
         doc = Document(source)
         documents[relative] = doc
         for element in doc.elements:
@@ -259,6 +261,10 @@ def plan(root, manifest):
         raise ValueError("Keep the private manifest outside the public input directory")
     docs, found = inventory(root)
     declared = json.loads(manifest.read_text(encoding="utf-8"))
+    return plan_documents(root, declared, docs, found)
+
+
+def plan_documents(root, declared, docs, found, inject_assets=True):
     # Validate before relying on IDs or mutating our in-memory version snapshot.
     assess(declared)
     items = {item["id"]: dict(item) for item in declared["items"]}
@@ -331,21 +337,53 @@ def plan(root, manifest):
         source = doc.source
         for start, end, replacement in sorted(replacements, reverse=True):
             source = source[:start] + replacement + source[end:]
-        depth = len(Path(relative).parts) - 1
-        css_url = "../" * depth + "ai-disclosure.css"
-        match = re.search(r"</head\s*>", source, flags=re.I)
-        if not match:
-            found["gaps"].append({"file": relative, "reason": "HTML document needs an explicit head closing tag"})
-        else:
-            player_script = ('<script defer src="' + "../" * depth + 'ai-disclosure-players.js"></script>\n'
-                             if 'data-aid-player="' in source else '')
-            source = source[:match.start()] + '<link rel="stylesheet" href="' + css_url + '">\n' + player_script + source[match.start():]
+        if inject_assets:
+            depth = len(Path(relative).parts) - 1
+            css_url = "../" * depth + "ai-disclosure.css"
+            match = re.search(r"</head\s*>", source, flags=re.I)
+            if not match:
+                found["gaps"].append({"file": relative, "reason": "HTML document needs an explicit head closing tag"})
+            else:
+                player_script = ('<script defer src="' + "../" * depth + 'ai-disclosure-players.js"></script>\n'
+                                 if 'data-aid-player="' in source else '')
+                source = source[:match.start()] + '<link rel="stylesheet" href="' + css_url + '">\n' + player_script + source[match.start():]
         edits[relative] = source
     result["inventory"] = found
     result["ready_to_render"] = not (found["gaps"] or result["role_gaps"] or any(
         row["status"] == "needs_review" for row in result["results"]))
     result["visual_verification_required"] = True
     return result, edits
+
+
+def fragment_inventory(root, source, page="index.html"):
+    """Inspect one trusted rendered component without writing it to disk."""
+    if not isinstance(page, str) or not page or page.startswith("/") or "\\" in page:
+        raise ValueError("Fragment page must be a relative public HTML path")
+    if any(part.startswith(".") for part in page.split("/")) or urlsplit(page).scheme or "?" in page or "#" in page:
+        raise ValueError("Invalid fragment page path")
+    if not isinstance(source, str):
+        raise ValueError("Fragment must be HTML text")
+    source = source.strip()
+    doc = Document(source)
+    roots = [e for e in doc.elements if e.parent is None]
+    if (len(roots) != 1 or not roots[0].attrs.get("data-ai-content")
+            or roots[0].start != 0 or roots[0].end != len(source)):
+        raise ValueError("Fragment must be exactly one closed data-ai-content root")
+    return inventory(root, [(page, source)])
+
+
+def render_fragment(root, source, declared, page="index.html"):
+    """Render a versioned component; return no HTML while facts/coverage are unresolved."""
+    root = root.resolve()
+    docs, found = fragment_inventory(root, source, page)
+    report, rendered = plan_documents(root, declared, docs, found, inject_assets=False)
+    output = rendered[page] if report["ready_to_render"] else None
+    assets = {}
+    if output is not None:
+        assets["ai-disclosure.css"] = STYLE
+        if 'data-aid-player="' in output:
+            assets["ai-disclosure-players.js"] = (Path(__file__).resolve().parents[1] / "assets/players.js").read_text(encoding="utf-8")
+    return {"html": output, "assets": assets, "report": report}
 
 
 def build(root, manifest, output):
@@ -430,15 +468,31 @@ def nonempty_fact(value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("inventory", "record", "plan", "build"))
+    parser.add_argument("command", choices=("inventory", "record", "plan", "build", "inspect-fragment", "render-fragment"))
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--facts", type=Path)
+    parser.add_argument("--html", type=Path)
+    parser.add_argument("--page", default="index.html")
     parser.add_argument("--role", choices=("publisher", "provider", "both", "unknown"))
     args = parser.parse_args()
     try:
-        if args.command == "inventory":
+        if args.command in {"inspect-fragment", "render-fragment"}:
+            if args.html is None:
+                raise ValueError("Fragment commands need --html")
+            source = args.html.read_text(encoding="utf-8")
+            if args.command == "inspect-fragment":
+                result = fragment_inventory(args.root, source, args.page)[1]
+                code = int(bool(result["gaps"]))
+            else:
+                if args.manifest is None:
+                    raise ValueError("render-fragment needs --manifest")
+                if args.root.resolve() in args.manifest.resolve().parents:
+                    raise ValueError("Keep private facts outside the public asset root")
+                result = render_fragment(args.root, source, json.loads(args.manifest.read_text(encoding="utf-8")), args.page)
+                code = int(result["html"] is None)
+        elif args.command == "inventory":
             result = inventory(args.root)[1]
             code = int(bool(result["gaps"]))
         elif args.command == "record":

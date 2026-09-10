@@ -84,3 +84,22 @@ Record `kind: "chatbot"`, `direct_ai_interaction: true`, scope and evidence. Kee
 This is presentation support for a declared AI interaction, not a chatbot service or automatic widget discovery. It neither generates replies nor intercepts network requests. Provider/both/unknown roles still receive unresolved-role findings for duties this package does not implement. An existing publisher can use it to present its provider's interaction disclosure; building an AI product may make that customer a provider and requires that separate assessment. External widget frames, voice interactions and native apps need their own integration. Do not reclassify the customer's role merely to pass a build. No obvious-interaction exception is automated.
 
 Chat facts bind the component revision. Conversation replies are not individually represented by that template hash; independently published answers or exported transcripts require their own records and appropriate notices. Browser fixtures test presentation and template replacement, with no connected model.
+
+## CMS and server-rendered components
+
+The fragment path runs the same assessment and placement rules against an in-memory rendered component, without crawling other pages or writing a temporary HTML document. It is available as Python functions `fragment_inventory` and `render_fragment` in `scripts/site.py`, or as CLI commands:
+
+```sh
+python3 <skill-directory>/scripts/site.py inspect-fragment --root public-assets --html component.html --page news/index.html
+python3 <skill-directory>/scripts/site.py render-fragment --root public-assets --html component.html --page news/index.html --manifest component-facts.json
+```
+
+Input must be exactly one closed `data-ai-content` root, using the same article, figure or chat templates. Nested independently encountered media needs its own binding and fact record. `--page` is the actual relative public document location used to resolve local asset URLs. Prefer root-relative asset URLs for components reused across routes. Keep private facts outside the public asset root.
+
+At a generation/editorial transaction, inspect the actual rendered component to obtain its revision, then save that revision together with evidenced origin, context and any valid review in the CMS's own transactional records. Do not refresh facts during a routine read just to eliminate a stale-record error. The renderer does not mutate those records or verify their authenticity.
+
+A successful render returns `html`, `assets` and a private `report`. `assets` maps required local filenames to contents: stylesheet and, for media, player script. Serve versioned copies once through the application's existing static asset pipeline and load them in the enclosing page. Load the player runtime before inserting dynamic media; its observer mounts newly inserted rendered players. Resolve content and asset versions atomically. Cache results by content revision, asset revisions, declared facts and toolkit version, not content ID alone.
+
+On any unresolved finding, `html` is null and `assets` is empty. Hold that update and retain the previous published version; never treat null as an instruction to delete existing content or publish the original unlabelled component. Initial server rendering and client navigation must use the same rendered component, including the notice. Do not expose the private report or CMS origin evidence in a public JSON response.
+
+This tool is not an HTML sanitizer. Pass trusted template output with user content escaped/sanitized by the host application; it preserves existing HTML. It is a rendering integration point, not automatic support for every CMS, framework, iframe, native client or export. Verify the final route, scrolling, CSS/CSP, accessibility and application caching. The browser fixture exercises a recorded update and holds an unrecorded one; it does not stand in for production integration tests.

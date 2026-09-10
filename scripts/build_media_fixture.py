@@ -30,3 +30,33 @@ for r in p.inventory(root)[1]['records']:
 f=pathlib.Path('.local-preview/media-facts.json')
 f.write_text(json.dumps({'version':1,'role':'publisher','items':items}))
 print(p.build(root,f,pathlib.Path('.local-preview/media-output'))['ready_to_render'])
+
+# Two actual CMS-style renders plus a rejected update, served by the browser fixture.
+component='<article data-ai-content="dynamic"><h2>Published item</h2><!-- ai-disclosure --><p>First version.</p></article>'
+def component_facts(source):
+    row=p.fragment_inventory(root,source)[1]['records'][0]
+    return {'version':1,'role':'publisher','items':[{'id':row['id'],'revision':row['revision'],
+        'kind':'text','origin':'ai_generated','applicable':True,'public_interest':True,
+        'evidence':'Fixture publishing transaction'}]}
+first_facts=component_facts(component)
+first=p.render_fragment(root,component,first_facts)
+updated=component.replace('First version.','Second version.')
+second=p.render_fragment(root,updated,component_facts(updated))
+rejected=p.render_fragment(root,updated.replace('Second version.','Unrecorded version.'),first_facts)
+output=pathlib.Path('.local-preview/media-output')
+(output/'dynamic.json').write_text(json.dumps({'html':second['html']}))
+(output/'rejected.json').write_text(json.dumps({'html':rejected['html']}))
+(output/'dynamic.html').write_text('<html><head><title>Dynamic publishing fixture</title>'
+    '<link rel="stylesheet" href="ai-disclosure.css"><script defer src="dynamic.js"></script></head><body>'
+    '<div id="publication">'+first['html']+'</div>'
+    '<button data-update="dynamic.json">Publish recorded update</button>'
+    '<button data-update="rejected.json">Try unrecorded update</button><p role="status"></p></body></html>')
+(output/'dynamic.js').write_text('''document.querySelectorAll('[data-update]').forEach(button=>{
+  button.addEventListener('click',async()=>{
+    const response=await fetch(button.dataset.update);
+    const result=await response.json();
+    if(result.html===null){document.querySelector('[role=status]').textContent='Update held: evidence is stale.';return;}
+    document.querySelector('#publication').innerHTML=result.html;
+    document.querySelector('[role=status]').textContent='Published recorded update.';
+  });
+});''')

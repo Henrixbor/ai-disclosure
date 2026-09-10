@@ -26,6 +26,24 @@ function record_for(int $id, array $source): ?array {
     if (!is_array($record) || ($record['policy'] ?? '') !== \AiDisclosure\POLICY) return null;
     return $record;
 }
+function record_id(array $record): string { return hash('sha256', wp_json_encode($record)); }
+function audit_key(int $id, string $record_id): string { return 'ai_disclosure_audit_' . $id . '_' . $record_id; }
+function replace_record(string $key, array $previous, array $replacement): bool {
+    global $wpdb;
+    // WordPress's update_option has no compare-and-swap argument. Compare the full
+    // stored value so a writer using an old record cannot overwrite a newer one.
+    $changed = $wpdb->query($wpdb->prepare(
+        "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND HEX(option_value) = HEX(%s)",
+        maybe_serialize($replacement), $key, maybe_serialize($previous)));
+    wp_cache_delete($key, 'options');
+    if ($changed === false) throw new \RuntimeException('Assessment storage update could not be confirmed');
+    return $changed === 1;
+}
+function private_record(array $record): array {
+    return ['record_id' => record_id($record), 'policy' => $record['policy'], 'decision' => $record['status'], 'facts' => $record['facts'],
+        'actor' => $record['actor'], 'recorded_at' => $record['recorded_at'],
+        'supersedes' => $record['supersedes'] ?? null, 'amendment_reason' => $record['amendment_reason'] ?? null];
+}
 function supported_text(array $source): bool {
     // Dynamic blocks, shortcodes and independent media need dedicated integrations.
     foreach ([$source['content'], $source['excerpt']] as $html) {
@@ -52,13 +70,20 @@ function assessment_route($request) {
     $post = get_post((int) $request['id']);
     $source = snapshot($post);
     if ($request->get_method() === 'GET') {
-        return ['revision' => revision($source), 'recorded' => record_for($post->ID, $source) !== null,
+        $current = record_for($post->ID, $source);
+        return ['revision' => revision($source), 'recorded' => $current !== null,
+            'assessment' => $current ? private_record($current) : null,
             'supported_text' => supported_text($source), 'policy' => \AiDisclosure\POLICY];
     }
     if (strlen($request->get_body()) > 1048576) return new \WP_Error('ai_disclosure_size', 'Assessment request exceeds 1 MiB.', ['status' => 413]);
     $body = json_decode($request->get_body());
-    if (!($body instanceof \stdClass) || array_diff(array_keys(get_object_vars($body)), ['title', 'content', 'excerpt', 'facts', 'role'])) {
+    if (!($body instanceof \stdClass) || array_diff(array_keys(get_object_vars($body)), ['title', 'content', 'excerpt', 'facts', 'role', 'replaces', 'amendment_reason'])) {
         return new \WP_Error('ai_disclosure_input', 'Expected proposed text fields and facts.', ['status' => 400]);
+    }
+    $amending = property_exists($body, 'replaces') || property_exists($body, 'amendment_reason');
+    if ($amending && (!is_string($body->replaces ?? null) || !preg_match('/^[a-f0-9]{64}$/D', $body->replaces)
+        || !\AiDisclosure\nonempty($body->amendment_reason ?? null) || strlen($body->amendment_reason) > 1000)) {
+        return new \WP_Error('ai_disclosure_input', 'Amendments require the current record ID and a reason of at most 1000 bytes.', ['status' => 400]);
     }
     foreach (array_keys($source) as $key) {
         if (property_exists($body, $key)) {
@@ -72,9 +97,6 @@ function assessment_route($request) {
     if (array_diff(array_keys(get_object_vars($item)), ['origin', 'applicable', 'public_interest', 'evidence', 'review'])) {
         return new \WP_Error('ai_disclosure_input', 'Supply supported text facts only; identity and revision are computed.', ['status' => 400]);
     }
-    foreach (['id', 'kind', 'revision'] as $owned) {
-        if (property_exists($item, $owned)) return new \WP_Error('ai_disclosure_input', 'The adapter computes identity, kind and revision.', ['status' => 400]);
-    }
     $item->id = 'wp-' . $post->ID;
     $item->kind = 'text';
     $item->revision = revision($source);
@@ -87,23 +109,60 @@ function assessment_route($request) {
         'facts' => json_decode(wp_json_encode($item), true), 'actor' => get_current_user_id(), 'recorded_at' => gmdate('c')];
     ksort($record['facts']);
     if (isset($record['facts']['review'])) ksort($record['facts']['review']);
-    // One immutable record per content version: concurrent declarations cannot replace each other.
     $key = record_key($post->ID, $item->revision);
     $existing = get_option($key);
     if ($existing) {
-        if (($existing['facts'] ?? null) !== $record['facts'] || ($existing['policy'] ?? '') !== $record['policy']) {
-            return new \WP_Error('ai_disclosure_conflict', 'This version already has different facts. Reassessment requires an explicit amendment workflow.', ['status' => 409]);
+        $same = ($existing['facts'] ?? null) === $record['facts'] && ($existing['policy'] ?? '') === $record['policy'];
+        $retry = $amending && $same && ($existing['supersedes'] ?? null) === $body->replaces
+            && ($existing['amendment_reason'] ?? null) === $body->amendment_reason;
+        if ($retry || (!$amending && $same)) {
+            $record = $existing;
+        } elseif (!$amending || !hash_equals(record_id($existing), $body->replaces)) {
+            return new \WP_Error('ai_disclosure_conflict', 'Read the current assessment and explicitly amend that record.', ['status' => 409]);
+        } elseif ($same) {
+            $record = $existing;
+        } else {
+            $record['supersedes'] = record_id($existing);
+            $record['amendment_reason'] = $body->amendment_reason;
+            $auditKey = audit_key($post->ID, $record['supersedes']);
+            if (!add_option($auditKey, $existing, '', false) && get_option($auditKey) !== $existing) {
+                return new \WP_Error('ai_disclosure_storage', 'Could not retain the previous assessment; no amendment applied.', ['status' => 503]);
+            }
+            try { $changed = replace_record($key, $existing, $record); }
+            catch (\RuntimeException $error) {
+                return new \WP_Error('ai_disclosure_storage', 'Could not confirm the storage update. Read the current assessment before retrying.', ['status' => 503]);
+            }
+            if (!$changed) {
+                return new \WP_Error('ai_disclosure_conflict', 'The assessment changed during this request; read it before retrying.', ['status' => 409]);
+            }
+            clean_post_cache($post->ID);
+            do_action('ai_disclosure_assessment_amended', $post->ID, $item->revision);
         }
+    } elseif ($amending) {
+        return new \WP_Error('ai_disclosure_conflict', 'There is no current assessment for this proposed version to amend.', ['status' => 409]);
     } elseif (!add_option($key, $record, '', false)) {
         return new \WP_Error('ai_disclosure_conflict', 'Another assessment was recorded; read it before retrying.', ['status' => 409]);
+    } else {
+        clean_post_cache($post->ID);
+        do_action('ai_disclosure_assessment_recorded', $post->ID, $item->revision);
     }
-    return ['revision' => $item->revision, 'decision' => $decision['status'], 'policy' => $assessment['policy'], 'implementation_verified' => false];
+    return ['revision' => $item->revision, 'record_id' => record_id($record), 'decision' => $record['status'],
+        'policy' => $assessment['policy'], 'implementation_verified' => false];
 }
 
 add_action('rest_api_init', static function () {
     register_rest_route('ai-disclosure/v1', '/posts/(?P<id>\d+)/assessment', [
         'methods' => ['GET', 'POST'], 'callback' => __NAMESPACE__ . '\\assessment_route',
         'permission_callback' => __NAMESPACE__ . '\\permitted',
+    ]);
+    register_rest_route('ai-disclosure/v1', '/posts/(?P<id>\d+)/assessments/(?P<record_id>[a-f0-9]{64})', [
+        'methods' => 'GET', 'permission_callback' => __NAMESPACE__ . '\\permitted',
+        'callback' => static function ($request) {
+            if (!permitted($request)) return new \WP_Error('ai_disclosure_forbidden', 'Permission denied.', ['status' => 403]);
+            $record = get_option(audit_key((int) $request['id'], $request['record_id']));
+            if (!$record) return new \WP_Error('ai_disclosure_missing', 'No archived assessment with that ID.', ['status' => 404]);
+            return private_record($record);
+        },
     ]);
 });
 add_filter('rest_post_dispatch', static function ($response, $server, $request) {

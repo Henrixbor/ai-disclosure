@@ -44,7 +44,8 @@
                     "revision",
                     "recorded",
                     "supported_text",
-                    "policy"
+                    "policy",
+                    "assessment"
                   ],
                   "properties": {
                     "revision": {
@@ -58,6 +59,16 @@
                     },
                     "policy": {
                       "type": "string"
+                    },
+                    "assessment": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/PrivateRecord"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   }
                 }
@@ -95,7 +106,8 @@
                     "revision",
                     "decision",
                     "policy",
-                    "implementation_verified"
+                    "implementation_verified",
+                    "record_id"
                   ],
                   "properties": {
                     "revision": {
@@ -116,6 +128,10 @@
                     "implementation_verified": {
                       "type": "boolean",
                       "const": false
+                    },
+                    "record_id": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
                     }
                   }
                 }
@@ -138,6 +154,55 @@
             "$ref": "#/components/responses/Error"
           },
           "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai-disclosure/v1/posts/{id}/assessments/{record_id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "record_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "readArchivedAssessment",
+        "responses": {
+          "200": {
+            "description": "One private retained snapshot. Presence alone does not prove replacement committed; inspect the active record and its supersedes chain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivateRecord"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
             "$ref": "#/components/responses/Error"
           }
         }
@@ -273,6 +338,137 @@
                 }
               }
             }
+          },
+          "replaces": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Current record ID; required when amending facts."
+          },
+          "amendment_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Nonblank reason, limited to 1000 UTF-8 bytes."
+          }
+        },
+        "dependentRequired": {
+          "replaces": [
+            "amendment_reason"
+          ],
+          "amendment_reason": [
+            "replaces"
+          ]
+        }
+      },
+      "PrivateRecord": {
+        "type": "object",
+        "required": [
+          "record_id",
+          "policy",
+          "decision",
+          "facts",
+          "actor",
+          "recorded_at",
+          "supersedes",
+          "amendment_reason"
+        ],
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "policy": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "facts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "revision",
+              "origin"
+            ],
+            "properties": {
+              "origin": {
+                "type": "string",
+                "enum": [
+                  "human",
+                  "ai_generated",
+                  "ai_modified",
+                  "unknown"
+                ]
+              },
+              "evidence": {
+                "type": "string",
+                "minLength": 1
+              },
+              "applicable": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "public_interest": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "review": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "revision",
+                  "substantive_human_review",
+                  "responsible_entity"
+                ],
+                "properties": {
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "substantive_human_review": {
+                    "type": "boolean"
+                  },
+                  "responsible_entity": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "const": "text"
+              },
+              "revision": {
+                "type": "string"
+              }
+            }
+          },
+          "actor": {
+            "type": "integer"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "supersedes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "amendment_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }

@@ -22,6 +22,9 @@ async function main() {
     const anonymous = await fetch(new URL('/?rest_route=/ai-disclosure/v1/posts/' + result.id + '/assessment', base));
     assert.ok(anonymous.status >= 400);
     assert.equal(anonymous.headers.get('cache-control'), 'private, no-store');
+    const history = await fetch(new URL('/?rest_route=' + result.history_route, base));
+    assert.ok(history.status >= 400);
+    assert.equal(history.headers.get('cache-control'), 'private, no-store');
     browser = await chromium.launch();
     for (const width of [390, 1440]) {
       const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width, height: 1000 } });
@@ -37,7 +40,7 @@ async function main() {
     const feed = await (await fetch(new URL('/?feed=rss2', base))).text();
     assert.ok(feed.includes('AI-modified'));
     assert.ok(!feed.includes('WORDPRESS_PRIVATE_EVIDENCE'));
-    console.log('WordPress 7.1: real publishing checks, anonymous denial, mobile/desktop notices without JS and feed privacy passed');
+    console.log('WordPress 7.1: publishing, amendments, stale database writers, private history, no-JS notices and feed privacy passed');
   } finally {
     if (browser) await browser.close();
     await server[Symbol.asyncDispose]();

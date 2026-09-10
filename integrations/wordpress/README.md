@@ -1,6 +1,6 @@
 # WordPress adapter development
 
-This directory now contains an **experimental text publishing plugin** and native PHP assessment engine. WordPress 7.1/PHP 8.3 integration tests cover REST and native post updates, superseded-policy scheduling checks, public content/excerpts/feeds and private evidence. It is not a production compliance plugin: broader surfaces, editor UI, reassessment/amendment, historical inventory and legal review remain open.
+This directory contains an **experimental text publishing plugin** and native PHP assessment engine. WordPress 7.1/PHP 8.3 integration tests cover REST/native updates, explicit amendments, stale-writer rejection, superseded-policy scheduling checks, public content/excerpts/feeds and private evidence. It is not a production compliance plugin: broader surfaces, editor UI, historical inventory and legal review remain open.
 
 Activation adds publication gates for ordinary posts and pages. New publication and edits to published content through the supported routes need evidence recorded first. Unsupported body media, dynamic blocks and shortcodes are held. Test on an isolated copy before activation on an existing site; this can interrupt workflows that have not been integrated. Activation does not retroactively classify or rewrite historical posts.
 
@@ -31,9 +31,21 @@ The plugin is agent/API-oriented at this stage. Use WordPress's existing authent
 
 These are example fields, not defaults to apply to a customer. Omitted/unknown role and unresolved facts cannot pass. Generation jobs should provide actual evidence automatically. Historical content needs established facts; do not infer origin from appearance. The `review` object follows the shared manifest format and must refer to the actual current/proposed revision. A substantive edit cannot silently reuse its exception.
 
-Each policy/content version has an immutable record in a non-autoloaded WordPress option. The database's unique option name prevents conflicting concurrent inserts; identical retries return the existing decision. A conflicting declaration returns 409. There is no amendment UI/API yet, so do not attempt to evade a conflict with a fabricated content edit. An explicit reassessment workflow is required before production adoption. Records are retained on deactivation; this is not a retention/deletion policy.
+Each policy/content version has an active record in a non-autoloaded WordPress option. The database's unique option name prevents conflicting initial inserts; identical retries return the existing decision. Changing facts requires the explicit amendment flow below. Records are retained on deactivation; this is not a retention/deletion policy.
 
-Successful assessments return `revision`, `decision`, `policy` and `implementation_verified: false`. The GET response returns current `revision`, `recorded`, `supported_text` and `policy`. Responses use `Cache-Control: private, no-store`. Request bodies are limited to 1 MiB. WordPress error objects carry `code`, `message` and `data.status`: authentication/capability failures use 401/403, malformed inputs 400, conflicts/publication gaps 409, oversized requests 413, and unsupported surfaces or unresolved facts/roles 422. See [OpenAPI](openapi.json). The development `/v1` contract must be versioned for breaking changes; there is no list endpoint or pagination contract yet.
+Successful assessments return `revision`, `record_id`, `decision`, `policy` and `implementation_verified: false`. GET returns current `revision`, `recorded`, `supported_text`, `policy` and a private `assessment` object (or null). That object includes facts, decision, record ID, actor/time, policy and any superseded-record ID/amendment reason. Do not forward it to visitors. Responses use `Cache-Control: private, no-store`. Request bodies are limited to 1 MiB. WordPress errors carry `code`, `message` and `data.status`: authentication/capability failures use 401/403, malformed inputs 400, conflicts/publication gaps 409, oversized requests 413, unresolved facts/roles/surfaces 422, and an audit-storage failure 503. See [OpenAPI](openapi.json). Breaking changes require a new API version; there is no list endpoint.
+
+## Correct facts or update a review
+
+Read the current private assessment. POST the complete replacement `facts`, established `role`, `replaces` set to its `record_id`, and a nonempty `amendment_reason` (at most 1000 UTF-8 bytes). Keep the actual title/content/excerpt unchanged when only the assessment changes. For a proposed content update, supply the proposed text fields and the record ID returned when that proposed version was assessed.
+
+The server assesses the replacement facts before changing anything. It archives the old record, then atomically replaces the active database value only if the old value still matches byte-for-byte. A stale writer receives 409; read the current assessment before deciding whether to try again. Repeating a successful amendment with the same replaced ID, facts and reason returns the same record ID without another write or event. A retry after a later amendment receives 409.
+
+An authorized caller can read a retained record at `GET /wp-json/ai-disclosure/v1/posts/{id}/assessments/{record_id}`. This retrieves one archived snapshot, not an unbounded history list; unknown or other-post IDs return 404. A snapshot is saved before the database replacement, so its presence alone does not prove an amendment committed. The active record and its `supersedes` chain establish the committed state. The same capability checks and private/no-store headers apply. The current record remains available through the singular assessment endpoint.
+
+Rejected or unresolved amendments leave the active assessment unchanged; they do not revoke it. If its evidence is no longer valid and a supported replacement cannot be established, withdraw the content through WordPress's normal draft/unpublish workflow while resolving the issue. A dedicated revocation UI is not implemented.
+
+Committed first records and amendments clear WordPress's post/object cache and emit `ai_disclosure_assessment_recorded` or `ai_disclosure_assessment_amended` with post ID and content revision. Connect external page/CDN caches to these hooks and verify invalidation before adoption. No private facts are included in the event arguments. A newly required label must not remain absent from a previously cached page.
 
 ## Presentation and coverage
 
@@ -77,7 +89,7 @@ The verifier compares complete results across 9,253 inputs: origin and scope com
 
 ## Remaining integration contract
 
-Before production use, complete the amendment workflow, editor interaction, historical inventory, applicable additional surfaces and independent legal review. Test the exact target WordPress/database/theme combination; the current live fixture uses Playground's SQLite runtime.
+Before production use, complete editor interaction/revocation, historical inventory, applicable additional surfaces and independent legal review. Test the exact target WordPress/database/theme combination; the current live fixture uses Playground's SQLite runtime, including a real database compare-and-swap check.
 
 Publication gates must be verified against REST/block-editor updates, classic-editor updates, scheduled posts and supported programmatic publication. WordPress offers a [REST pre-insert filter](https://developer.wordpress.org/reference/hooks/rest_pre_insert_this-post_type/) and an [insert short-circuit filter](https://developer.wordpress.org/reference/hooks/wp_insert_post_empty_content/), but neither alone establishes coverage of every publishing path. Do not advertise that coverage until tested against a running WordPress instance.
 

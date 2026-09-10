@@ -79,5 +79,60 @@ aid_check(!is_wp_error(wp_update_post(['ID' => $reviewed, 'post_status' => 'publ
 aid_check(\AiDisclosure\WordPress\notice($reviewed) === '', 'No unnecessary notice for current review');
 aid_check(aid_rest('POST', '/wp/v2/posts/' . $reviewed, ['content' => '<p>Changed after review.</p>'])->get_status() === 409, 'Review cannot silently cover edits');
 
-file_put_contents('/wordpress/aid-test-result.json', wp_json_encode(['id' => $id, 'checks' => 'passed']));
-echo "WordPress REST, native-update, scheduling and evidence checks passed\n";
+$current = aid_rest('GET', $reviewRoute)->get_data()['assessment'];
+aid_check($current['facts']['review']['responsible_entity'] === 'Fictional test publisher', 'Authorized caller can inspect evidence before amending');
+$amendment = ['role' => 'publisher', 'facts' => $facts, 'replaces' => $current['record_id'],
+    'amendment_reason' => 'Withdraw the declared review exception; use an explicit notice.'];
+$amendmentEvents = 0;
+add_action('ai_disclosure_assessment_amended', function () use (&$amendmentEvents) { $amendmentEvents++; });
+aid_check(aid_rest('POST', $reviewRoute, ['role' => 'publisher', 'facts' => $facts])->get_status() === 409, 'Changed facts require explicit amendment');
+aid_check(aid_rest('POST', $reviewRoute, array_merge($amendment, ['amendment_reason' => ' ']))->get_status() === 400, 'Amendment needs reason');
+$unknown = $amendment;
+$unknown['facts']['origin'] = 'unknown';
+aid_check(aid_rest('POST', $reviewRoute, $unknown)->get_status() === 422, 'Unresolved amendment does not replace active record');
+aid_check(aid_rest('GET', $reviewRoute)->get_data()['assessment']['record_id'] === $current['record_id'], 'Rejected amendment preserves active record');
+$amended = aid_rest('POST', $reviewRoute, $amendment);
+aid_check($amended->get_status() === 200 && $amended->get_data()['decision'] === 'disclose', 'Explicit amendment changes the decision');
+aid_check(str_contains(\AiDisclosure\WordPress\notice($reviewed), 'AI-generated'), 'Amended notice takes effect without a content edit');
+aid_check(get_post($reviewed)->post_content === '<p>Reviewed text.</p>', 'Amendment does not change post content');
+$retry = aid_rest('POST', $reviewRoute, $amendment);
+aid_check($retry->get_status() === 200 && $retry->get_data()['record_id'] === $amended->get_data()['record_id'], 'Amendment retry is idempotent');
+aid_check($amendmentEvents === 1, 'Cache integration event fires once, after committed amendment');
+$stale = $amendment;
+$stale['facts']['evidence'] = 'Another correction based on an old record';
+aid_check(aid_rest('POST', $reviewRoute, $stale)->get_status() === 409, 'Stale amendment cannot overwrite winner');
+$historyRoute = '/ai-disclosure/v1/posts/' . $reviewed . '/assessments/' . $current['record_id'];
+$history = aid_rest('GET', $historyRoute);
+aid_check($history->get_status() === 200 && $history->get_data() === $current, 'Previous record is retained unchanged');
+wp_set_current_user(0);
+aid_check(aid_rest('GET', $historyRoute)->get_status() >= 400, 'Archived evidence remains private');
+wp_set_current_user(1);
+aid_check(aid_rest('GET', '/ai-disclosure/v1/posts/' . $id . '/assessments/' . $current['record_id'])->get_status() === 404, 'History record is bound to its post');
+
+$storageAttempt = $amendment;
+$storageAttempt['replaces'] = $amended->get_data()['record_id'];
+$storageAttempt['facts']['evidence'] = 'Revised private source reference';
+$storageAttempt['amendment_reason'] = 'Update the evidence reference.';
+$failUpdate = static function ($query) {
+    return str_contains($query, 'HEX(option_value)') ? 'UPDATE ai_disclosure_missing_table SET value = 1' : $query;
+};
+global $wpdb;
+$previousErrors = $wpdb->suppress_errors(true);
+add_filter('query', $failUpdate);
+try { $storageFailure = aid_rest('POST', $reviewRoute, $storageAttempt); }
+finally { remove_filter('query', $failUpdate); $wpdb->suppress_errors($previousErrors); }
+aid_check($storageFailure->get_status() === 503, 'Database failure is not reported as a successful amendment');
+aid_check(aid_rest('GET', $reviewRoute)->get_data()['assessment']['record_id'] === $amended->get_data()['record_id'], 'Failed database write preserves active record');
+aid_check($amendmentEvents === 1, 'Failed database write emits no committed event');
+
+// Exercise an actual database CAS with two writers holding the same old value.
+$casKey = 'ai_disclosure_cas_fixture';
+$previous = ['token' => 'original'];
+add_option($casKey, $previous, '', false);
+aid_check(\AiDisclosure\WordPress\replace_record($casKey, $previous, ['token' => 'ORIGINAL']), 'First database writer succeeds with a case-only change');
+aid_check(!\AiDisclosure\WordPress\replace_record($casKey, $previous, ['token' => 'stale-writer']), 'Second database writer is rejected');
+aid_check(get_option($casKey) === ['token' => 'ORIGINAL'], 'Object cache reflects the committed winner');
+delete_option($casKey);
+
+file_put_contents('/wordpress/aid-test-result.json', wp_json_encode(['id' => $id, 'history_route' => $historyRoute, 'checks' => 'passed']));
+echo "WordPress publishing, amendment, database conflict and evidence checks passed\n";

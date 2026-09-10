@@ -11,6 +11,21 @@ const login = require('./wordpress_login.cjs');
 async function editorChecks(browser, base, result, password) {
   const context = await browser.newContext();
   const page = await context.newPage();
+  await page.addInitScript(() => {
+    window.__aidPointerSignals = [];
+    for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const control = target?.closest('[data-aid-load], [data-aid-save], [data-aid-withdraw]');
+      window.__aidPointerSignals.push({ type, tag: target?.tagName, id: target?.id,
+        control: control?.hasAttribute('data-aid-load') ? 'load' : control?.hasAttribute('data-aid-save') ? 'save' : control ? 'withdraw' : null,
+        trusted: event.isTrusted });
+      if (window.__aidPointerSignals.length > 12) window.__aidPointerSignals.shift();
+    }, true);
+  });
+  const inspections = [];
+  page.on('response', response => {
+    if (new URL(response.url()).pathname.endsWith('/inspection')) inspections.push(response.status());
+  });
   const editorHash = createHash('sha256').update(await readFile(resolve(__dirname, '../integrations/wordpress/editor.js'))).digest('hex');
   const submitted = [];
   page.on('request', request => {
@@ -105,7 +120,11 @@ async function editorChecks(browser, base, result, password) {
       assert.equal(body.expected_revision, 'sha256:' + createHash('sha256').update(JSON.stringify(snapshot)).digest('hex'), 'Editor binds the exact submitted source');
     }
   } catch (error) {
+    console.error('Editor inspection response statuses:', JSON.stringify(inspections));
     console.error(JSON.stringify(await page.evaluate(() => ({
+      pointerSignals: window.__aidPointerSignals,
+      loadDisabled: document.querySelector('[data-aid-load]')?.disabled,
+      fieldsDisabled: document.querySelector('[data-aid-fields]')?.disabled,
       panels: [...document.querySelectorAll('.aid-editor')].map(el => {
         const parents = []; for (let node = el; node && parents.length < 7; node = node.parentElement) parents.push({ tag: node.tagName, id: node.id, class: node.className, display: getComputedStyle(node).display });
         return parents;

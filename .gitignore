@@ -10,3 +10,5 @@ release/
 examples/nextjs/.next/
 examples/nextjs/out/
 examples/nextjs/.generated/
+
+/out/

@@ -167,6 +167,22 @@ class PublishingTests(unittest.TestCase):
                 self.write(IMAGE.replace('park.svg', url))
                 self.assertTrue(publisher.inventory(self.root)[1]["gaps"])
 
+    def test_chat_notice_precedes_conversation_without_javascript(self):
+        self.write('<section class="aid-chat" data-ai-content="chat"><h2>Support</h2><!-- ai-disclosure -->'
+                   '<div role="log">Conversation</div><form><label>Message<textarea></textarea></label></form></section>')
+        self.facts({"kind": "chatbot", "direct_ai_interaction": True})
+        self.assertTrue(publisher.build(self.root, self.manifest, self.output)["ready_to_render"])
+        rendered = (self.output / "index.html").read_text()
+        self.assertIn("You are interacting with AI.", rendered)
+        self.assertLess(rendered.index("You are interacting"), rendered.index('role="log"'))
+        self.assertNotIn('<script', rendered)
+
+    def test_chat_notice_after_composer_is_rejected(self):
+        self.write('<section class="aid-chat" data-ai-content="chat"><textarea></textarea><!-- ai-disclosure --></section>')
+        self.facts({"kind": "chatbot", "direct_ai_interaction": True})
+        self.assertFalse(publisher.build(self.root, self.manifest, self.output)["ready_to_render"])
+        self.assertFalse(self.output.exists())
+
     def media_fixture(self, kind="audio", notice=True):
         (self.root / "recording.wav").write_bytes(b"test recording")
         (self.root / "notice.wav").write_bytes(b"test notice")

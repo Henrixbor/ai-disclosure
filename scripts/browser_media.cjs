@@ -33,7 +33,28 @@ const {spawn}=require('node:child_process');
   assert.equal(await nojs.locator('[data-aid-play]').isDisabled(),true);
   assert.equal(await nojs.locator('[data-aid-content]').getAttribute('src'),null);
   assert.equal(await nojs.locator('.aid-notice').isVisible(),true);
+  for (const width of [390,1440]) {
+   await nojs.setViewportSize({width,height:800});
+   await nojs.goto('http://127.0.0.1:4174/chat.html#composer');
+   const notice=nojs.locator('.aid-notice');
+   assert.equal(await notice.textContent(),'You are interacting with AI.');
+   const bounds=await notice.boundingBox();
+   assert.ok(bounds.y>=0 && bounds.y+bounds.height<=800,'Chat notice remains visible at deep-linked composer');
+   await nojs.getByRole('textbox',{name:'Message'}).focus();
+   assert.equal(await notice.isVisible(),true);
+  }
+  await page.goto('http://127.0.0.1:4174/chat.html');
+  await page.evaluate(()=>{
+   const old=document.querySelector('.aid-chat');
+   const resumed=old.cloneNode(true);
+   resumed.querySelector('[role=log]').textContent='Resumed test conversation';
+   old.replaceWith(resumed);
+  });
+  await page.getByRole('textbox',{name:'Message'}).fill('Test message');
+  await page.getByRole('button',{name:'Send test message'}).click();
+  assert.equal(await page.locator('.aid-notice').count(),1);
+  assert.equal(await page.locator('.aid-notice').isVisible(),true);
   assert.deepEqual(errors,[]);
-  console.log('PASS: real audio sequencing, pause, configuration invalidation, notice failure, no-JS visibility. Silence fixture does not validate spoken wording.');
+  console.log('PASS: chat first rendering, deep links, mobile and resumed template; real audio sequencing, pause, configuration invalidation, notice failure, no-JS visibility. Silence fixture does not validate spoken wording.');
  } finally {if(browser) await browser.close(); server.kill();}
 })().catch(e=>{console.error(e);process.exit(1)});

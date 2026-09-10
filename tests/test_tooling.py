@@ -78,6 +78,14 @@ class AssessmentTests(unittest.TestCase):
         for kind in ("other", "chatbot"):
             self.assertEqual(self.assess(kind=kind)["status"], "needs_review")
 
+    def test_chat_interaction_requires_explicit_evidence_and_scope(self):
+        self.assertEqual(self.assess(kind="chatbot", direct_ai_interaction=True)["status"], "disclose")
+        for facts in ({"direct_ai_interaction": False}, {"direct_ai_interaction": None},
+                      {"direct_ai_interaction": True, "applicable": None}):
+            self.assertEqual(self.assess(kind="chatbot", **facts)["status"], "needs_review")
+        with self.assertRaises(ValueError):
+            self.assess(kind="chatbot", direct_ai_interaction="true")
+
     def test_provider_role_never_looks_complete(self):
         for role in ("provider", "both", "unknown"):
             result = policy.assess({"version": 1, "role": role, "items": [self.item]})

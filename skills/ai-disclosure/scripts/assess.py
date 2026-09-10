@@ -5,11 +5,11 @@ import json
 import sys
 from pathlib import Path
 
-POLICY = "eu-article50-publisher-prototype-2026-09-10"
+POLICY = "eu-article50-transparency-development-2026-09-10.2"
 KINDS = {"text", "image", "audio", "video", "code", "chatbot", "other"}
 ORIGINS = {"human", "ai_generated", "ai_modified", "unknown"}
 FIELDS = {"id", "revision", "kind", "origin", "applicable", "evidence",
-          "public_interest", "deepfake", "creative_work", "review", "audio_deepfake"}
+          "public_interest", "deepfake", "creative_work", "review", "audio_deepfake", "direct_ai_interaction"}
 
 
 def nonempty(value):
@@ -36,7 +36,7 @@ def validate(data):
         seen.add(item["id"])
         if item["kind"] not in KINDS or item["origin"] not in ORIGINS:
             raise ValueError("Unsupported kind or origin: " + item["id"])
-        for key in ("applicable", "public_interest", "deepfake", "creative_work", "audio_deepfake"):
+        for key in ("applicable", "public_interest", "deepfake", "creative_work", "audio_deepfake", "direct_ai_interaction"):
             if item.get(key) is not None and type(item[key]) is not bool:
                 raise ValueError(key + " must be boolean or null")
         if "evidence" in item and not nonempty(item["evidence"]):
@@ -62,14 +62,17 @@ def decide(item):
 
     if item["kind"] == "other":
         return result("needs_review", "Unsupported surface or content type")
-    if item["kind"] == "chatbot":
-        return result("needs_review", "Assess Article 50(1) separately; normally show a session-start AI notice")
     if not nonempty(item.get("evidence")):
         return result("needs_review", "Supply evidence for declared origin and scope facts")
     if item.get("applicable") is None:
         return result("needs_review", "Establish jurisdiction, role and temporal scope")
     if item["applicable"] is False:
         return result("outside_declared_scope", "Based on supplied scope evidence, not independently verified")
+    if item["kind"] == "chatbot":
+        if item.get("direct_ai_interaction") is not True:
+            return result("needs_review", "Establish direct AI interaction; this helper does not grant obvious-interaction exceptions")
+        return result("disclose", "Direct AI interaction declared; render an explicit interaction notice",
+                      "Visible at session start before conversation or composer; retain on resumed sessions")
     if item["kind"] == "code":
         return result("no_publisher_label", "Source-code authorship alone is not displayed-content disclosure")
     if item["origin"] == "unknown":

@@ -2,7 +2,7 @@
 
 Minimal AI disclosure guidance for coding agents. Ask an agent to inspect a site, apply appropriate notices and verify the result without adding unnecessary banners.
 
-**Status: local development release.** Includes one portable skill, dependency-free assessment and HTML publishing tools, and a project installer. Article/image output is implemented; an experimental local audio/video player is in development, while live-chat and general runtime adapters remain unimplemented. No hosted service or published package yet. Rules have not been reviewed by counsel. Assessment output is not legal certification.
+**Status: local development release.** Includes one portable skill, dependency-free assessment and HTML publishing tools, and a project installer. Article/image output is implemented; an experimental local audio/video player is in development, and a local chat wrapper renders interaction notices. General runtime adapters remain incomplete. No hosted service or published package yet. Rules have not been reviewed by counsel. Assessment output is not legal certification.
 
 ## Install into a project
 

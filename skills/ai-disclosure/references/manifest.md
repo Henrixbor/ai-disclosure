@@ -43,3 +43,5 @@ Unknown optional facts use null or omission. No extra fields are accepted: this 
 This deliberately narrow tool does not infer legal facts, implement notices, inspect a site, verify exports, implement provider marking, grant a chatbot exception, or support every Article 50 case. The agent handles supported edits and documents the remaining gaps.
 
 For the experimental HTML video player, declare `audio_deepfake` (boolean): whether the video contains deepfake audio. This controls the spoken-notice requirement and is a declared fact, not an audio detector result.
+
+For chat interaction presentation, declare `direct_ai_interaction: true` only when supported by evidence of the actual system and user flow. Missing/false/null remains unresolved. The helper does not infer this from the origin of the widget’s source code or grant the obvious-interaction exception.

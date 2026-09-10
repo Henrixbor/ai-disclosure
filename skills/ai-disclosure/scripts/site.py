@@ -21,6 +21,7 @@ ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}\Z")
 SLOT = "<!-- ai-disclosure -->"
 STYLE = """/* AI Disclosure: local, visible without JavaScript. */
 .aid-notice{display:inline-flex;align-items:center;gap:.35em;max-width:100%;box-sizing:border-box;font:500 .8125rem/1.5 system-ui,sans-serif;color:#183d33;background:#f2faf6;border:1px solid #55776c;border-radius:.3rem;padding:.2rem .5rem;text-decoration:none;vertical-align:middle}
+.aid-chat>.aid-notice{position:sticky;top:0;z-index:3;display:table}
 .aid-notice:focus-visible{outline:3px solid #145acc;outline-offset:3px}
 .aid-media{position:relative;display:block}.aid-media>.aid-notice{position:absolute;inset:.6rem auto auto .6rem;z-index:2}
 .aid-media>img,.aid-media>video{display:block;max-width:100%;height:auto}
@@ -294,7 +295,19 @@ def plan(root, manifest):
                     if owned[0][0] > first:
                         found["gaps"].append({"file": relative, "id": key, "reason": "Text disclosure slot must precede body content"})
                         continue
-                label = "AI-generated" if item["origin"] == "ai_generated" else "AI-modified"
+                elif item["kind"] == "chatbot":
+                    if element.tag not in {"section", "div", "aside"} or "aid-chat" not in element.attrs.get("class", "").split():
+                        found["gaps"].append({"file": relative, "id": key, "reason": "Chat binding needs section/div/aside.aid-chat"})
+                        continue
+                    if not any(a == owned[0][0] and parent is element for a, b, parent in doc.slots):
+                        found["gaps"].append({"file": relative, "id": key, "reason": "Chat notice slot must be a direct child of the chat binding"})
+                        continue
+                    first = min((e.start for e in descendants if e.tag not in {"h1", "h2", "h3", "h4", "h5", "h6"}), default=element.end)
+                    if owned[0][0] > first:
+                        found["gaps"].append({"file": relative, "id": key, "reason": "Chat notice must precede conversation and interaction controls"})
+                        continue
+                label = ("You are interacting with AI." if item["kind"] == "chatbot" else
+                         "AI-generated" if item["origin"] == "ai_generated" else "AI-modified")
                 notice = '<span class="aid-notice" data-ai-disclosure="' + html.escape(key, quote=True) + '">' + label + '</span>'
                 replacements.append((*owned[0], notice))
             else:

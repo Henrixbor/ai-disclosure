@@ -1,6 +1,6 @@
 # HTML publishing adapter
 
-This adapter renders local, static article and image disclosures. An experimental local audio/video player is also available, with the limitations below. Chatbot widgets, canvas and external frames still require dedicated integration; builds report these gaps rather than claim coverage. Use the customer's existing build output as input and deploy only the new output after browser verification.
+This adapter renders local, static article and image disclosures. An experimental local audio/video player is also available, with the limitations below. A local HTML chat wrapper can carry interaction notices. Canvas and external frames still require dedicated integration; builds report these gaps rather than claim coverage. Use the customer's existing build output as input and deploy only the new output after browser verification.
 
 ## Bind once in the source template
 
@@ -65,3 +65,22 @@ The generated player holds the content source until its spoken notice finishes. 
 This is an experimental adapter, not production media coverage. Caption tracks and alternative sources are currently rejected, not stripped. Downloads, direct asset URLs, external players, live streams, picture-in-picture, exported clips and people joining midway need separate solutions. Do not use it where those surfaces or accessibility needs remain unresolved. Playback sequencing tests use silent test files and do not establish the adequacy of an actual spoken disclosure.
 
 Asset revisions include locally referenced media, posters and notices. Remote assets, missing files and paths escaping the public root are unresolved. Replacing media bytes invalidates the old manifest even when HTML is unchanged. Freeze the source build during inventory, recording and staging.
+
+## Chat interaction wrapper
+
+Use the site's existing conversation component with this source structure:
+
+```html
+<section class="aid-chat" data-ai-content="support-chat">
+  <h2>Support</h2>
+  <!-- ai-disclosure -->
+  <div role="log" aria-label="Conversation"><!-- existing conversation --></div>
+  <form><!-- existing labelled composer and controls --></form>
+</section>
+```
+
+Record `kind: "chatbot"`, `direct_ai_interaction: true`, scope and evidence. Keep the slot a direct child before conversation and controls. The adapter writes a visible interaction notice; its default sticky placement retains it when a visitor follows a deep link to the composer. Verify against the site's scroll containers, headers and CSS. Reuse the rendered wrapper for new and resumed sessions. Do not insert only a composer or transcript while leaving the notice behind. The notice has no acceptance or dismissal state and needs no JavaScript.
+
+This is presentation support for a declared AI interaction, not a chatbot service or automatic widget discovery. It neither generates replies nor intercepts network requests. Provider/both/unknown roles still receive unresolved-role findings for duties this package does not implement. An existing publisher can use it to present its provider's interaction disclosure; building an AI product may make that customer a provider and requires that separate assessment. External widget frames, voice interactions and native apps need their own integration. Do not reclassify the customer's role merely to pass a build. No obvious-interaction exception is automated.
+
+Chat facts bind the component revision. Conversation replies are not individually represented by that template hash; independently published answers or exported transcripts require their own records and appropriate notices. Browser fixtures test presentation and template replacement, with no connected model.

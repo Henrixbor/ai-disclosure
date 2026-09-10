@@ -21,10 +21,13 @@ module.exports = async function concurrencyChecks(docker, web, base) {
   const initial = await run('amend', 'setup');
   const amendMarkers = ['amend-a', 'amend-b'].map(mode => marker('amend', mode));
   const competing = Promise.allSettled(['amend-a', 'amend-b'].map(mode => run('amend', mode)));
+  let barrierError;
   try { await waitReady(amendMarkers); }
+  catch (error) { barrierError = error; }
   finally { await release(amendMarkers); }
   const settled = await competing;
   for (const result of settled) if (result.status === 'rejected') throw result.reason;
+  if (barrierError) throw new Error(barrierError.message + ': ' + JSON.stringify(settled));
   const results = settled.map(result => result.value);
   assert.notEqual(results[0].connection_id, results[1].connection_id, 'Competing writers must use different database connections');
   assert.deepEqual(results.map(result => result.status).sort(), [200, 409]);
@@ -34,13 +37,21 @@ module.exports = async function concurrencyChecks(docker, web, base) {
   assert.equal(current.history.facts.evidence, initial.facts.evidence);
   console.log('Concurrent MySQL amendments: one committed winner, one conflict, original history retained');
 
-  await run('withdraw-first', 'setup');
+  const withdrawSetup = await run('withdraw-first', 'setup');
   const publishMarker = marker('withdraw-first', 'publish-wait');
   const publishing = Promise.allSettled([run('withdraw-first', 'publish-wait')]);
   try {
     await waitReady([publishMarker]);
     assert.equal((await run('withdraw-first', 'withdraw')).status, 200);
   } finally { await release([publishMarker]); }
+  const afterWriteMarker = marker('withdraw-first', 'after-write');
+  try {
+    await waitReady([afterWriteMarker]);
+    const intermediate = await run('withdraw-first', 'inspect');
+    assert.equal(intermediate.status, 'draft', 'Database must remain draft before corrective hooks run');
+    const publicRead = await fetch(new URL('/?p=' + withdrawSetup.id, base));
+    assert.equal(publicRead.status, 404, 'Intermediate anonymous reader must not see withdrawn content');
+  } finally { await release([afterWriteMarker]); }
   const published = (await publishing)[0];
   if (published.status === 'rejected') throw published.reason;
   const withdrawn = await run('withdraw-first', 'inspect');
@@ -48,7 +59,7 @@ module.exports = async function concurrencyChecks(docker, web, base) {
   assert.equal(withdrawn.current.assessment.decision, 'withdrawn');
   const response = await fetch(new URL('/?p=' + withdrawn.current.assessment.facts.id.replace('wp-', ''), base));
   assert.equal(response.status, 404);
-  console.log('Withdrawal during publication: final state is draft and anonymous HTTP access is denied');
+  console.log('Withdrawal during publication: draft and anonymous HTTP 404 verified before corrective hooks and after completion');
 
   await run('publish-first', 'setup');
   const withdrawMarker = marker('publish-first', 'withdraw-wait');

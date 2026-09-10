@@ -171,6 +171,31 @@ aid_check(!\AiDisclosure\WordPress\replace_record($casKey, $previous, ['token' =
 aid_check(get_option($casKey) === ['token' => 'ORIGINAL'], 'Object cache reflects the committed winner');
 delete_option($casKey);
 
+// Check the database state before corrective hooks, including wpdb percent escaping.
+$guarded = wp_insert_post(['post_title' => 'Guarded 50% fixture', 'post_content' => '<p>50% — café and "quotes".</p>', 'post_status' => 'draft'], true);
+$guardedRoute = '/ai-disclosure/v1/posts/' . $guarded;
+$guardedFacts = $facts;
+$guardedFacts['evidence'] .= ' 50%';
+$guardedRecord = aid_rest('POST', $guardedRoute . '/assessment', ['role' => 'publisher', 'facts' => $guardedFacts])->get_data();
+$withdrawBeforeWrite = static function ($postId, $data) use ($guarded, $guardedRoute, $guardedRecord) {
+    if ($postId === $guarded && $data['post_status'] === 'publish') {
+        $response = aid_rest('POST', $guardedRoute . '/withdrawal', ['revision' => $guardedRecord['revision'], 'replaces' => $guardedRecord['record_id'], 'reason' => 'Withdraw immediately before publication SQL']);
+        aid_check($response->get_status() === 200, 'Pre-write withdrawal committed');
+    }
+};
+$observedStatus = null;
+$observeWrite = static function ($postId) use ($guarded, &$observedStatus) {
+    if ($postId === $guarded && $observedStatus === null) {
+        global $wpdb;
+        $observedStatus = $wpdb->get_var($wpdb->prepare("SELECT post_status FROM {$wpdb->posts} WHERE ID = %d", $postId));
+    }
+};
+add_action('pre_post_update', $withdrawBeforeWrite, 10, 2);
+add_action('post_updated', $observeWrite, 1);
+try { wp_update_post(['ID' => $guarded, 'post_status' => 'publish'], true); }
+finally { remove_action('pre_post_update', $withdrawBeforeWrite, 10); remove_action('post_updated', $observeWrite, 1); }
+aid_check($observedStatus === 'draft', 'Conditional publication write never exposed the withdrawn version before corrective hooks');
+
 // Historical discovery is bounded, private, and never guesses source facts.
 function aid_inventory(array $query = []) {
     $request = new WP_REST_Request('GET', '/ai-disclosure/v1/inventory');

@@ -25,9 +25,9 @@ function race_pause(string $marker): void {
     } while (true);
 }
 if ($mode === 'setup') {
-    $id = wp_insert_post(['post_title' => 'Concurrent fixture ' . $phase, 'post_content' => '<p>Fictional concurrency test.</p>', 'post_status' => 'draft'], true);
+    $id = wp_insert_post(['post_title' => 'Concurrent fixture ' . $phase, 'post_content' => '<p>Fictional concurrency test: 50% — café and "quotes".</p>', 'post_status' => 'draft'], true);
     if (is_wp_error($id)) throw new Exception($id->get_error_message());
-    $facts = ['origin' => 'ai_generated', 'applicable' => true, 'public_interest' => true, 'evidence' => 'CONCURRENCY_PRIVATE_FIXTURE'];
+    $facts = ['origin' => 'ai_generated', 'applicable' => true, 'public_interest' => true, 'evidence' => 'CONCURRENCY_PRIVATE_FIXTURE 50%'];
     $response = race_request('POST', '/ai-disclosure/v1/posts/' . $id . '/assessment', ['role' => 'publisher', 'facts' => $facts]);
     if ($response->get_status() !== 200) throw new Exception('Could not assess race fixture');
     $state = ['id' => $id, 'facts' => $facts, 'record' => $response->get_data()];
@@ -56,9 +56,14 @@ if (in_array($mode, ['amend-a', 'amend-b'], true)) {
     $response = race_request('POST', $route . '/withdrawal', ['revision' => $state['record']['revision'],
         'replaces' => $state['record']['record_id'], 'reason' => 'Withdraw concurrent fixture']);
 } elseif (in_array($mode, ['publish', 'publish-wait'], true)) {
-    if ($mode === 'publish-wait') add_action('pre_post_update', static function ($id, $data) use ($state, $file) {
-        if ($id === $state['id'] && $data['post_status'] === 'publish') race_pause($file . '-publish-wait');
-    }, 10, 2);
+    if ($mode === 'publish-wait') {
+        add_action('pre_post_update', static function ($id, $data) use ($state, $file) {
+            if ($id === $state['id'] && $data['post_status'] === 'publish') race_pause($file . '-publish-wait');
+        }, 10, 2);
+        add_action('post_updated', static function ($id) use ($state, $file) {
+            if ($id === $state['id']) race_pause($file . '-after-write');
+        }, 1);
+    }
     $result = wp_update_post(['ID' => $state['id'], 'post_status' => 'publish'], true);
     echo wp_json_encode(['error' => is_wp_error($result), 'status' => get_post_status($state['id'])]);
     return;

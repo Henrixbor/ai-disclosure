@@ -11,6 +11,9 @@ async function editorChecks(browser, base, result, password) {
   const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultTimeout(10000);
+  // Cold admin requests through the single-worker WASM server can exceed the
+  // control timeout on CI. Keep navigation bounded independently of UI actions.
+  page.setDefaultNavigationTimeout(60000);
   // Preferences hydrate asynchronously: the welcome guide may reopen and
   // the Meta Boxes area may collapse. Use native controls before each action.
   async function ensureEditor() {

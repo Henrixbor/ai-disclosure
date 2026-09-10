@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Minimal AI disclosures for existing websites. A small agent skill and local publishing checks, with clear scope and no visitor tracking.">
+  <title>AI Disclosure — Less noise. Clearer AI.</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="masthead">
+    <a href="#" class="brand" aria-label="AI Disclosure home"><span class="brand-mark" aria-hidden="true">ai.</span> disclosure</a>
+    <nav aria-label="Main"><a href="#how">How it works</a><a href="#scope">Scope</a><a href="#install" class="nav-install">Install the skill <span aria-hidden="true">↗</span></a></nav>
+  </header>
+  <main id="main" data-ai-content="website">
+    <div class="page-origin"><!-- ai-disclosure --><span>Documentation · Development preview</span></div>
+    <section class="hero" aria-labelledby="headline">
+      <div class="hero-copy">
+        <div class="eyebrow">FOR THE SITES WE BUILD WITH AI</div>
+        <h1 id="headline">Less noise.<br><em>Clearer AI.</em></h1>
+        <p class="intro">Give your coding agent the context to add appropriate AI disclosures. Keep the site you designed.</p>
+        <div class="hero-actions"><a class="button" href="#install">Start with the skill <span aria-hidden="true">↗</span></a><a class="text-link" href="#example">See a small disclosure <span aria-hidden="true">↓</span></a></div>
+        <div class="attributes"><span>Local tools</span><span>MIT licensed</span><span>No visitor tracking</span></div>
+      </div>
+      <div class="preview" id="example">
+        <div class="preview-bar"><span class="dot" aria-hidden="true"></span> An article on your site <span class="preview-tag">EXAMPLE</span></div>
+        <article class="sample-article" data-ai-content="example-article">
+          <div class="sample-category">FIELD NOTES / A FICTIONAL EXAMPLE</div>
+          <h2>A little more room<br>for the everyday.</h2>
+          <!-- ai-disclosure -->
+          <p>A proposal to turn an unused corner into a shared garden gives neighbours a place to grow, meet, and spend a little time outside.</p>
+          <div class="sample-art" aria-hidden="true"><div class="sun"></div><div class="stem one"></div><div class="stem two"></div><div class="stem three"></div><div class="ground"></div></div>
+          <p class="caption">A notice by the title. The story keeps its space.</p>
+        </article>
+        <div class="preview-foot"><span aria-hidden="true">↳</span> This notice is rendered by the publishing tool.</div>
+      </div>
+    </section>
+    <section class="workflow" id="how" aria-labelledby="how-title">
+      <div class="section-heading"><span class="eyebrow">ONE SMALL ADDITION TO YOUR WORKFLOW</span><h2 id="how-title">Your agent makes the edits.<br>The publishing checks keep them honest.</h2></div>
+      <ol class="steps">
+        <li><span class="step-number">01</span><h3>Find the content.</h3><p>Inspect the site's publishing paths and establish what was generated, modified, or reviewed.</p></li>
+        <li><span class="step-number">02</span><h3>Choose the right notice.</h3><p>Apply the supported rules to the content's context. Keep unknowns visible to the publisher.</p></li>
+        <li><span class="step-number">03</span><h3>Publish with a check.</h3><p>Render a small notice and catch changed content or stale editorial reviews before release.</p></li>
+      </ol>
+    </section>
+    <section class="installation" id="install" aria-labelledby="install-title">
+      <div><span class="eyebrow">CODEX + CLAUDE CODE</span><h2 id="install-title">A small skill.<br>A plain-language request.</h2><p>From a local checkout of the repository, install into your site's project. Python 3.9+ is the only requirement for these tools.</p></div>
+      <div class="terminal-wrap"><div class="terminal"><div class="terminal-title">FROM THE AI DISCLOSURE REPOSITORY</div><pre><code>python3 scripts/install.py \
+  --project /path/to/your-site</code></pre><div class="terminal-rule"></div><div class="terminal-title">THEN ASK YOUR CODING AGENT</div><blockquote>“Fix this site's AI disclosure requirements with the least intrusive appropriate notices. Use ai-disclosure and verify the result.”</blockquote></div><p class="install-note">Installs the same skill for both agents. Nothing is published, and global settings stay unchanged.</p></div>
+    </section>
+    <section class="scope" id="scope" aria-labelledby="scope-title">
+      <div class="section-heading"><span class="eyebrow">CLEAR ABOUT WHAT IT COVERS</span><h2 id="scope-title">Transparency tools.<br>With their own transparency.</h2></div>
+      <div class="scope-grid"><div><h3>Available in this preview</h3><ul><li>Portable coding-agent skill and local installer</li><li>Evidence-based publisher assessment input</li><li>Static article and image disclosure rendering</li><li>Content-version checks and review invalidation</li></ul></div><div><h3>Still being completed</h3><ul><li>Audio/video and live-chat integrations</li><li>Dynamic publishing adapters and export checks</li><li>Public release and independent legal review</li></ul></div></div>
+      <p class="scope-note">AI Disclosure supports AI Act transparency work. It does not detect every AI asset, certify legal compliance, or replace requirements concerning privacy, copyright and misleading content. An installed skill needs a publishing integration to handle future content automatically.</p>
+      <a class="text-link" href="https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content">Read the European Commission's transparency guidance <span aria-hidden="true">↗</span></a>
+    </section>
+  </main>
+  <footer><a class="brand" href="#"><span class="brand-mark" aria-hidden="true">ai.</span> disclosure</a><span>Built to be small. Designed to be inspected.</span><span>© 2026 Henrixbor</span></footer>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "ai-disclosure-development",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Development-only browser verification for AI Disclosure; the shipped skill has no npm dependencies.",
+  "scripts": {
+    "test:browser": "node scripts/browser_smoke.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

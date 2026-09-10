@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+research/sources/
+release-site/
+.local-preview/
+node_modules/

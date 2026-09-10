@@ -57,6 +57,27 @@ $route = '/ai-disclosure/v1/posts/' . $id . '/assessment';
 $facts = ['origin' => 'ai_generated', 'applicable' => true, 'public_interest' => true,
     'evidence' => 'WORDPRESS_PRIVATE_EVIDENCE: explicit fictional test declaration'];
 $declaration = ['role' => 'publisher', 'facts' => $facts];
+$bindingId = wp_insert_post(['post_title' => 'Version binding fixture', 'post_content' => '<p>Original migration text.</p>', 'post_status' => 'draft'], true);
+$bindingRoute = '/ai-disclosure/v1/posts/' . $bindingId . '/assessment';
+$bindingOriginal = aid_rest('GET', $bindingRoute)->get_data()['revision'];
+wp_update_post(['ID' => $bindingId, 'post_title' => 'Edited after inspection']);
+$bindingCurrent = aid_rest('GET', $bindingRoute)->get_data()['revision'];
+aid_check($bindingOriginal !== $bindingCurrent, 'Migration fixture actually changes revision');
+$staleBinding = aid_rest('POST', $bindingRoute, $declaration + ['expected_revision' => $bindingOriginal]);
+aid_check($staleBinding->get_status() === 409 && $staleBinding->get_data()['code'] === 'ai_disclosure_revision', 'Stale migration evidence is rejected with a revision conflict');
+aid_check(aid_rest('GET', $bindingRoute)->get_data()['assessment'] === null, 'Revision conflict writes no assessment for the new content');
+foreach ([null, 1, [], 'v1', 'sha256:' . str_repeat('A', 64), $bindingCurrent . "\n"] as $badRevision) {
+    aid_check(aid_rest('POST', $bindingRoute, $declaration + ['expected_revision' => $badRevision])->get_status() === 400, 'Malformed expected revision rejected');
+}
+$bound = aid_rest('POST', $bindingRoute, $declaration + ['expected_revision' => $bindingCurrent]);
+aid_check($bound->get_status() === 200, 'Exact saved version accepts established facts');
+aid_check(aid_rest('POST', $bindingRoute, $declaration + ['expected_revision' => $bindingCurrent])->get_data()['record_id'] === $bound->get_data()['record_id'], 'Guarded identical retry preserves record identity');
+$proposedBinding = '<p>Explicit proposed migration text.</p>';
+$proposedRevision = aid_rest('POST', '/ai-disclosure/v1/posts/' . $bindingId . '/inspection', ['content' => $proposedBinding])->get_data()['revision'];
+aid_check(aid_rest('POST', $bindingRoute, $declaration + ['content' => $proposedBinding, 'expected_revision' => $bindingCurrent])->get_status() === 409, 'Expected revision covers final proposed source, not only the saved source');
+aid_check(aid_rest('POST', '/ai-disclosure/v1/posts/' . $bindingId . '/inspection', ['content' => $proposedBinding])->get_data()['assessment'] === null, 'Proposed-version conflict creates no assessment');
+aid_check(aid_rest('POST', $bindingRoute, $declaration + ['content' => $proposedBinding, 'expected_revision' => $proposedRevision])->get_status() === 200, 'Matching proposed revision can be assessed without publishing');
+aid_check(get_post($bindingId)->post_content === '<p>Original migration text.</p>', 'Version-bound recording does not edit post content');
 wp_set_current_user(0);
 aid_check(aid_rest('GET', $route)->get_status() >= 400, 'Anonymous inspection denied');
 aid_check(aid_rest('POST', $route, $declaration)->get_status() >= 400, 'Anonymous recording denied');

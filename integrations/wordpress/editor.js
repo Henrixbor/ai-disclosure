@@ -96,7 +96,7 @@ wp.domReady(() => {
     const facts = { origin: field('origin').value, evidence: field('evidence').value };
     for (const name of ['applicable', 'public_interest']) facts[name] = field(name).value === 'unknown' ? null : field(name).value === 'true';
     if (field('review').checked) facts.review = { revision: loaded.revision, substantive_human_review: true, responsible_entity: field('responsible_entity').value };
-    const payload = { ...text, role: field('role').value, facts };
+    const payload = { ...text, role: field('role').value, facts, expected_revision: loaded.revision };
     if (loaded.assessment) {
       const prior = { ...loaded.assessment.facts };
       for (const name of ['id', 'kind', 'revision']) delete prior[name];

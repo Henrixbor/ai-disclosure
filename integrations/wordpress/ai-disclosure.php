@@ -95,8 +95,12 @@ function assessment_route($request) {
     }
     if (strlen($request->get_body()) > 1048576) return new \WP_Error('ai_disclosure_size', 'Assessment request exceeds 1 MiB.', ['status' => 413]);
     $body = json_decode($request->get_body());
-    if (!($body instanceof \stdClass) || array_diff(array_keys(get_object_vars($body)), ['title', 'content', 'excerpt', 'facts', 'role', 'replaces', 'amendment_reason'])) {
+    if (!($body instanceof \stdClass) || array_diff(array_keys(get_object_vars($body)), ['title', 'content', 'excerpt', 'facts', 'role', 'replaces', 'amendment_reason', 'expected_revision'])) {
         return new \WP_Error('ai_disclosure_input', 'Expected proposed text fields and facts.', ['status' => 400]);
+    }
+    if (property_exists($body, 'expected_revision') && (!is_string($body->expected_revision)
+        || !preg_match('/^sha256:[a-f0-9]{64}$/D', $body->expected_revision))) {
+        return new \WP_Error('ai_disclosure_input', 'expected_revision must be a content SHA-256 revision.', ['status' => 400]);
     }
     $amending = property_exists($body, 'replaces') || property_exists($body, 'amendment_reason');
     if ($amending && (!is_string($body->replaces ?? null) || !preg_match('/^[a-f0-9]{64}$/D', $body->replaces)
@@ -108,6 +112,9 @@ function assessment_route($request) {
             if (!is_string($body->$key)) return new \WP_Error('ai_disclosure_input', 'Text fields must be strings.', ['status' => 400]);
             $source[$key] = $body->$key;
         }
+    }
+    if (property_exists($body, 'expected_revision') && !hash_equals(revision($source), $body->expected_revision)) {
+        return new \WP_Error('ai_disclosure_revision', 'The content version changed. Inspect it again before recording facts.', ['status' => 409]);
     }
     if (!supported_text($source)) return new \WP_Error('ai_disclosure_surface', 'This text adapter cannot cover the proposed markup, media or dynamic content.', ['status' => 422]);
     if (!(($body->facts ?? null) instanceof \stdClass)) return new \WP_Error('ai_disclosure_input', 'Supply evidence-backed facts.', ['status' => 400]);

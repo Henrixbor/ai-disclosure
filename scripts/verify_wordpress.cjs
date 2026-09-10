@@ -4,12 +4,17 @@ const { readFile } = require('node:fs/promises');
 const { resolve } = require('node:path');
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const { randomBytes } = require('node:crypto');
+const { randomBytes, createHash } = require('node:crypto');
 const wordpressPackage = require('./wordpress_package.cjs');
 
 async function editorChecks(browser, base, result, password) {
   const context = await browser.newContext();
   const page = await context.newPage();
+  const editorHash = createHash('sha256').update(await readFile(resolve(__dirname, '../integrations/wordpress/editor.js'))).digest('hex');
+  const submitted = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && request.url().includes('/assessment')) submitted.push(request.postDataJSON());
+  });
   page.setDefaultTimeout(10000);
   // Cold admin requests through the single-worker WASM server can exceed the
   // control timeout on CI. Keep navigation bounded independently of UI actions.
@@ -33,6 +38,8 @@ async function editorChecks(browser, base, result, password) {
     await Promise.all([page.waitForURL('**/wp-admin/**'), page.locator('#wp-submit').click()]);
     for (const [mode, id] of [['classic', result.classic_id], ['block', result.block_id]]) {
       await page.goto(new URL('/wp-admin/post.php?post=' + id + '&action=edit', base).href);
+      const script = await page.locator('#ai-disclosure-editor-js').getAttribute('src');
+      assert.equal(new URL(script, base).searchParams.get('ver'), editorHash, 'Editor cache version follows the installed script bytes');
       if (mode === 'classic') {
         const textMode = page.locator('#content-html');
         if (await textMode.count()) await textMode.click();
@@ -92,6 +99,12 @@ async function editorChecks(browser, base, result, password) {
       assert.equal(published.status, 'publish', 'Editor publication must succeed with the assessed text');
       assert.ok(!published.content.rendered.includes('data-ai-disclosure='), 'Current declared review needs no extra label');
       console.log('Authenticated ' + mode + ' editor: stale text held, assessment recorded, review amended, withdrawn and restored, native publication passed');
+    }
+    assert.ok(submitted.length > 0, 'Editor must actually submit assessment requests');
+    for (const body of submitted) {
+      assert.match(body.expected_revision, /^sha256:[a-f0-9]{64}$/);
+      const snapshot = { title: body.title, content: body.content, excerpt: body.excerpt };
+      assert.equal(body.expected_revision, 'sha256:' + createHash('sha256').update(JSON.stringify(snapshot)).digest('hex'), 'Editor binds the exact submitted source');
     }
   } catch (error) {
     console.error(JSON.stringify(await page.evaluate(() => ({

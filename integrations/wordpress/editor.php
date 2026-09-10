@@ -36,7 +36,7 @@ add_action('admin_enqueue_scripts', static function ($hook) {
     if (!supported($post) || !current_user_can('edit_post', $post->ID)
         || !current_user_can(get_post_type_object($post->post_type)->cap->publish_posts)) return;
     wp_enqueue_style('ai-disclosure-editor', plugins_url('editor.css', __FILE__), [], '0.1.0-alpha.3');
-    wp_enqueue_script('ai-disclosure-editor', plugins_url('editor.js', __FILE__), ['wp-data', 'wp-dom-ready'], '0.1.0-alpha.3', true);
+    wp_enqueue_script('ai-disclosure-editor', plugins_url('editor.js', __FILE__), ['wp-data', 'wp-dom-ready'], hash_file('sha256', __DIR__ . '/editor.js'), true);
     wp_add_inline_script('ai-disclosure-editor', 'window.aiDisclosureEditor = ' . wp_json_encode([
         'postId' => $post->ID, 'restRoot' => rest_url('ai-disclosure/v1/posts/' . $post->ID . '/'),
         'nonce' => wp_create_nonce('wp_rest'),

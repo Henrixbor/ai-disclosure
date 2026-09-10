@@ -38,6 +38,8 @@ The panel does not save or publish the article itself. If the text changes after
 
 The proposed-text endpoint is `POST /wp-json/ai-disclosure/v1/posts/{id}/inspection` with optional string `title`, `content` and `excerpt` fields. It returns the revision, supported-text flag, policy and any private matching assessment without saving anything. It has the same capabilities, 1 MiB request limit and private/no-store headers as assessment recording. This also gives agents a way to bind a review to proposed text before publication.
 
+When recording facts, send that inspection's revision as `expected_revision` on the assessment request. The server compares it with the exact title/content/excerpt after applying any proposed text fields. A stale revision returns HTTP 409 with code `ai_disclosure_revision` before writing an assessment; malformed revisions return 400. Inspect again and reassess the evidence after a conflict. Do not silently substitute the newer revision. The editor sends this field automatically. It is additive and optional for existing API clients, but agents migrating saved content should always supply it. It is a content-version precondition, not a lock on publication or a replacement for the existing assessment ID/amendment checks.
+
 ## Inventory existing content
 
 Agents can read `GET /wp-json/ai-disclosure/v1/inventory?limit=25`. The endpoint requires publication capability, then checks edit and publication permissions on every item. It scans posts and pages in all statuses, including unpublished, auto-draft and trash records. It returns ID, type, status, a short title excerpt, exact text revision, `supported_text` and `decision`. It returns no evidence or article body and makes no changes.

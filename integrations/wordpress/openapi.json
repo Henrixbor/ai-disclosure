@@ -159,7 +159,8 @@
           "503": {
             "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "description": "Record established facts for a content version. Send expected_revision to reject stale inspected versions before any write. It does not publish content; existing amendment and idempotent-retry rules still apply."
       }
     },
     "/ai-disclosure/v1/posts/{id}/assessments/{record_id}": {
@@ -656,6 +657,13 @@
             "minLength": 1,
             "maxLength": 1000,
             "description": "Nonblank reason, limited to 1000 UTF-8 bytes."
+          },
+          "expected_revision": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "description": "Optional exact revision of the final title/content/excerpt after proposed fields are applied. A mismatch returns 409 before recording or amending. Use the inspection revision for evidence-backed migration and proposed edits. Omission preserves the existing API behavior.",
+            "minLength": 71,
+            "maxLength": 71
           }
         },
         "dependentRequired": {

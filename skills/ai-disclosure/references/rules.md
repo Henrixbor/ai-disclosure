@@ -36,3 +36,7 @@ Test rendered disclosures and supported exports. Manifest assessment is not a br
 - [Guidelines](https://ec.europa.eu/newsroom/dae/redirection/document/131215): §§2–4, 6–7; paragraphs 134–138, 142–144, 153–154.
 - [Code](https://ec.europa.eu/newsroom/dae/redirection/document/129555): Section 2, Measures 1.1–1.2 and Commitments 3–4. These are voluntary Code commitments, distinct from statutory text.
 - [Consolidated Act](https://eur-lex.europa.eu/eli/reg/2024/1689/2026-07-27/eng). Interpretive guidance does not replace legislation.
+
+## Code adherence and alternative presentation
+
+Installing the toolkit does not make a customer a Code signatory or attest that they have implemented every Code commitment. Its custom text badges are not the EU icon artwork. The [Commission icon guidance](https://digital-strategy.ec.europa.eu/en/policies/eu-icons-labelling-ai-generated-content) says icons are optional and do not establish compliance by themselves. Review the adequacy of the actual presentation and any organisational commitments separately. For relevant signatories using the editorial exception, Code Commitment 4 addresses editorial policies and public contact details; a manifest review object alone does not establish these.

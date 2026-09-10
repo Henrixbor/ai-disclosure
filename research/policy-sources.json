@@ -1,0 +1,21 @@
+{
+  "checked_on": "2026-09-10",
+  "sources": [
+    {
+      "id": "transparency-code",
+      "url": "https://ec.europa.eu/newsroom/dae/redirection/document/129555",
+      "sha256": "7bd22c5a3c56eaefda27a5bf7a6118198ef2a9c9255241bd97abf7cdedf9bc28"
+    },
+    {
+      "id": "article-50-guidelines",
+      "url": "https://ec.europa.eu/newsroom/dae/redirection/document/131215",
+      "sha256": "30861fc5de31205846f023068069c92fabc7271ebeac6af7bef68b97f0a33f66"
+    }
+  ],
+  "unverified": [
+    {
+      "url": "https://eur-lex.europa.eu/eli/reg/2024/1689/2026-07-27/eng",
+      "reason": "Direct retrieval presents a browser-verification page. Operative consolidated legislation must be checked during legal review."
+    }
+  ]
+}

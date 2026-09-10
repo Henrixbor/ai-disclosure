@@ -107,3 +107,5 @@ Validate paid demand for agency workspaces, managed policy distribution, team re
 Henrixbor owns releases, support triage and decisions about scope/claims. Assign an EU regulatory adviser to review policy changes and deployment-specific edge cases; no such review is represented as completed. Keep a dated source register and legal-review status. Critical security or disclosure regressions receive a documented fix/release path; customers receive actionable notices through channels they chose.
 
 Before public promotion, verify the public repository, release artifacts, install commands and website from outside the development checkout. Review all screenshots and examples for private data. Maintain a changelog explaining behaviour changes, migration steps and any changed legal basis.
+
+The [legal review package](legal-review.md) gives the reviewer concrete decisions, code, test outputs and launch claims to assess. Use its scoped approval record before treating the readiness phase as complete.

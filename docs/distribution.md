@@ -1,11 +1,12 @@
 # Distribution
 
-AI Disclosure maintains one skill under `skills/ai-disclosure`. Two archive layouts serve different installation routes:
+AI Disclosure maintains one skill under `skills/ai-disclosure`. Archive layouts serve different installation routes:
 
 | Archive | Layout and use |
 | --- | --- |
 | `ai-disclosure-skill.zip` | `ai-disclosure/SKILL.md` and its bundled tools. Extract into the agent's skills directory, or use the repository's project installer. |
 | `ai-disclosure-plugin.zip` | `ai-disclosure/.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, `skills/ai-disclosure`, README and licence. For plugin loaders and catalog maintainers. |
+| `ai-disclosure-wordpress.zip` | Experimental PHP text plugin for a WordPress test site. It contains no agent skill or migration CLI. Available when explicitly included in a release; follow the [WordPress guide](../integrations/wordpress/README.md) before activation. |
 
 Download versioned assets from [GitHub releases](https://github.com/Henrixbor/ai-disclosure/releases). Development versions are prereleases, not a production/legal-compliance guarantee. Compare downloaded files against `SHA256SUMS` from the same release, for example with `shasum -a 256 -c SHA256SUMS`. Checksums detect changed bytes; they are not a signature or an independent trust guarantee.
 
@@ -35,9 +36,9 @@ The Codex plugin manifest is validated against the bundled plugin schema. This r
 ## Maintainer release procedure
 
 1. Bump both plugin manifests to the same semantic version. Do not replace an existing version's assets with different content.
-2. Run Python and browser tests, build both archives, extract them, validate both host manifests and execute the extracted tools.
+2. Run Python and browser tests, build the skill/plugin archives and any included WordPress archive, extract them, validate both host manifests and execute the extracted tools. Verify the WordPress archive through its documented installation checks.
 3. Commit and push the exact source. Wait for that commit's GitHub checks to succeed.
-4. Create a GitHub release tied to that commit, upload both archives and SHA256SUMS, and mark development versions as prereleases.
+4. Create a GitHub release tied to that commit, upload the verified archives and SHA256SUMS, and mark development versions as prereleases. State which tooling remains repository-only.
 5. Download the public assets and compare their hashes with the locally verified files. Record the release URL and remaining limitations.
 
 ```sh

@@ -14,6 +14,27 @@ publishing = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(publishing)
 
 
+def build_showcase_outputs(output):
+    """Precompute honest demo transactions and a real portable HTML export."""
+    source = '<article data-ai-content="publishing-example"><h3>A fictional waterfront update.</h3><!-- ai-disclosure --><p>The garden opens for a fictional preview on Saturday.</p></article>'
+    def facts(fragment):
+        return {"version": 1, "role": "publisher", "items": [
+            {"id": row["id"], "revision": row["revision"], "kind": "image" if row["tag"] == "figure" else "text",
+             "origin": "ai_generated", "applicable": True, "public_interest": True, "deepfake": False,
+             "evidence": "Known AI-authored fictional showcase; generated image voluntarily labeled; text conservatively disclosed"}
+            for row in publishing.fragment_inventory(ROOT / "web", fragment)[1]["records"]]}
+    changed = source.replace("on Saturday", "on Sunday, with an extended afternoon session")
+    recorded = publishing.render_fragment(ROOT / "web", changed, facts(changed))
+    stale = publishing.render_fragment(ROOT / "web", changed, facts(source))
+    assert recorded["html"] is not None and stale["html"] is None
+    (output / "publishing-demo.json").write_text(json.dumps({
+        "recorded": {"html": recorded["html"]}, "stale": {"html": stale["html"]}}))
+    document = '<article data-ai-content="field-note"><h1>A place that exists only in imagination.</h1><!-- ai-disclosure --><p>This fictional field note and its illustration were created with AI. The pavilion is not a real destination.</p><figure class="aid-media" data-ai-content="field-image"><!-- ai-disclosure --><figcaption>AI-generated image — fictional coastal pavilion. Voluntary origin notice.</figcaption><img src="assets/pavilion.png" alt="AI-generated fictional limestone pavilion beside a blue sea"></figure><p>The image, notices and styling are embedded in this HTML document. Save it and open it offline to inspect the result.</p></article>'
+    exported = publishing.export_document(ROOT / "web", document, facts(document), "AI Disclosure — portable field note", "en")
+    assert exported["html"] is not None
+    (output / "field-note.html").write_text(exported["html"], encoding="utf-8")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
@@ -30,6 +51,8 @@ def main():
             for record in records
         ]}))
         result = publishing.build(ROOT / "web", manifest, args.output)
+        if result["ready_to_render"]:
+            build_showcase_outputs(args.output)
         print(json.dumps(result, indent=2))
         return int(not result["ready_to_render"])
 
